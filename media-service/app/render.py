@@ -178,6 +178,11 @@ class RenderService:
             tts_dur = seg.get('duration', 1.0)
             tts_path = seg['audio_path']
 
+            # Check if TTS file exists
+            if not Path(tts_path).exists():
+                logger.error(f"[COMBINE] TTS file not found: {tts_path}")
+                raise Exception(f"TTS file not found for segment {i}: {tts_path}")
+
             # Calculate delay in milliseconds to place this TTS at correct start time
             delay_ms = int(seg_start * 1000)
             temp_delayed = output_path.parent / f"temp_delayed_{i:03d}.mp3"
@@ -194,8 +199,14 @@ class RenderService:
             ]
             success, _, stderr = self._run_ffmpeg(cmd)
             if not success:
-                logger.error(f"[COMBINE] adelay failed for segment {i}: {stderr[:200]}")
-                raise Exception(f"Failed to delay segment {i}: {stderr[:200]}")
+                # Skip FFmpeg version header, show actual error
+                actual_error = stderr
+                if 'built with' in stderr:
+                    parts = stderr.split('built with', 1)
+                    if len(parts) > 1:
+                        actual_error = parts[1]
+                logger.error(f"[COMBINE] adelay failed for segment {i}: {actual_error[:500]}")
+                raise Exception(f"Failed to delay segment {i}: {actual_error[:500]}")
 
         # Mix all delayed TTS tracks into one audio
         mix_cmd = ['-i', str(delayed_files[0])]
