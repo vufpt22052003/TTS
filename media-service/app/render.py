@@ -202,28 +202,34 @@ class RenderService:
                 '-af', f'adelay={delay_ms}|{delay_ms}',
                 '-acodec', 'libmp3lame',
                 '-ab', '192k',
-                '-y',
-                temp_delayed_str
+                temp_delayed_str  # _run_ffmpeg already adds -y
             ]
-            success, _, stderr = self._run_ffmpeg(cmd)
+            success, stdout, stderr = self._run_ffmpeg(cmd)
             if not success:
-                # Extract actual error message from FFmpeg stderr
-                lines = stderr.strip().split('\n')
-                error_lines = []
-                skip_header = True
-                for line in lines:
-                    # Skip version/header lines, capture actual errors
-                    if any(x in line.lower() for x in ['error', 'invalid', 'failed', 'cannot', 'no such']):
-                        skip_header = False
-                    if not skip_header:
-                        error_lines.append(line)
-                    # Stop at "built with" line (end of header)
-                    if 'built with' in line.lower():
+                # Get full error, skipping version header
+                error_lines = stderr.split('\n')
+                actual_error_parts = []
+                for j, line in enumerate(error_lines):
+                    if 'Error' in line or 'error' in line or 'Invalid' in line or 'failed' in line:
+                        # Get this line and next 3 lines
+                        actual_error_parts = error_lines[j:j+5]
                         break
                 
-                actual_error = ' '.join(error_lines[:5]) if error_lines else stderr[-500:]
-                logger.error(f"[COMBINE] adelay failed for segment {i}: {actual_error[:500]}")
-                raise Exception(f"Failed to delay segment {i}: {actual_error[:500]}")
+                if actual_error_parts:
+                    actual_error = '\n'.join(actual_error_parts)
+                else:
+                    # Just get last 300 chars after version header
+                    after_header = stderr
+                    for marker in ['built with', 'configuration:']:
+                        if marker in after_header:
+                            parts = after_header.split(marker, 1)
+                            if len(parts) > 1:
+                                after_header = parts[1]
+                    actual_error = after_header.strip()[-300:]
+                
+                logger.error(f"[COMBINE] adelay failed for segment {i}: {actual_error}")
+                logger.error(f"[COMBINE] Full stderr length: {len(stderr)}")
+                raise Exception(f"Failed to delay segment {i}: {actual_error}")
 
         # Mix all delayed TTS tracks into one audio
         mix_cmd = ['-i', str(delayed_files[0])]
