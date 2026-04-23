@@ -263,15 +263,51 @@ class PipelineProcessor:
         )
 
         try:
-            # Step 1: Parse vietsub SRT directly
-            from app.utils import parse_srt_file
+            # Step 1: Parse vietsub - try dual format first (timestamp + Trung + Viet)
+            from app.utils import parse_vietsub_dual_format
             self._update_step(PipelineStep.TRANSCRIBE)
             logger.info(f"Loading vietsub from: {vietsub_path}")
-            segments = parse_srt_file(vietsub_path)
-            logger.info(f"Loaded {len(segments)} vietsub segments")
+            
+            # Try dual format first (3 lines per segment)
+            dual_parsed = parse_vietsub_dual_format(vietsub_path)
+            
+            if dual_parsed:
+                # Format: timestamp + Trung + Viet
+                # Use Vietnamese text directly - NO REWRITE, NO TRANSLATION
+                logger.info(f"Loaded {len(dual_parsed)} segments from dual-format vietsub")
+                translated_segments = []
+                for i, (seg, viet_text) in enumerate(dual_parsed, 1):
+                    # Use VIETNAMESE text directly - no rewriting
+                    translated_segments.append(TranslatedSegment(
+                        index=i,
+                        start=seg.start,
+                        end=seg.end,
+                        original=seg.text,  # Original Trung
+                        translated=viet_text  # Vietnamese - keep EXACT
+                    ))
+            else:
+                # Fallback: parse as normal SRT
+                from app.utils import parse_srt_file
+                segments = parse_srt_file(vietsub_path)
+                logger.info(f"Loaded {len(segments)} segments from standard SRT")
+                
+                if not segments:
+                    raise Exception("Vietsub file is empty or unrecognized format")
+                
+                # Use text as-is (no translation needed)
+                translated_segments = [
+                    TranslatedSegment(
+                        index=i,
+                        start=seg.start,
+                        end=seg.end,
+                        original=seg.text,
+                        translated=seg.text  # Already Vietnamese
+                    )
+                    for i, seg in enumerate(segments, 1)
+                ]
 
-            if not segments:
-                raise Exception("Vietsub file is empty")
+            if not translated_segments:
+                raise Exception("No segments parsed from vietsub file")
 
             # Extract original audio for mixing
             audio_path = job_dir / f"audio_{job_id}.mp3"

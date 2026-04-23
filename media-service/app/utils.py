@@ -137,8 +137,17 @@ def get_tts_voice_for_language(lang: str) -> str:
     return voice_map.get(lang_base, 'vi-VN-HoaiMyNeural')
 
 
-def parse_srt_file(srt_path: Path) -> List['SubtitleSegment']:
-    """Parse SRT file and return list of SubtitleSegment dataclass."""
+def parse_srt_file(srt_path: Path, has_dual_lang: bool = False) -> List['SubtitleSegment']:
+    """
+    Parse SRT file and return list of SubtitleSegment dataclass.
+    
+    Args:
+        srt_path: Path to SRT file
+        has_dual_lang: If True, expects format:
+            00:00:00,000 --> 00:00:08,000
+            原文 (Trung)
+            译文 (Viet)
+    """
     from dataclasses import dataclass
     
     @dataclass
@@ -153,39 +162,112 @@ def parse_srt_file(srt_path: Path) -> List['SubtitleSegment']:
     
     content = srt_path.read_text(encoding="utf-8")
     segments = []
+    lines_list = content.strip().split("\n")
     
-    # Split by double newlines
-    blocks = content.strip().split("\n\n")
-    
-    for block in blocks:
-        lines = block.strip().split("\n")
-        if len(lines) < 3:
-            continue
+    i = 0
+    segment_idx = 0
+    while i < len(lines_list):
+        line = lines_list[i].strip()
         
-        try:
-            # First line is index
-            index = int(lines[0].strip())
-            
-            # Second line is timestamp
-            timestamp = lines[1].strip()
-            start_str, end_str = timestamp.split(" --> ")
-            start = parse_timestamp(start_str)
-            end = parse_timestamp(end_str)
-            
-            # Rest is text
-            text = "\n".join(lines[2:])
-            
-            segments.append(SubtitleSegment(
-                index=index,
-                start=start,
-                end=end,
-                text=text
-            ))
-        except (ValueError, IndexError) as e:
-            logger.warning(f"Failed to parse SRT block: {e}")
-            continue
+        # Check if this line is a timestamp
+        if " --> " in line:
+            try:
+                start_str, end_str = line.split(" --> ")
+                start = parse_timestamp(start_str)
+                end = parse_timestamp(end_str)
+                
+                # Next line(s) are text
+                i += 1
+                text_lines = []
+                while i < len(lines_list) and lines_list[i].strip() and " --> " not in lines_list[i]:
+                    text_lines.append(lines_list[i].strip())
+                    i += 1
+                
+                text = " ".join(text_lines)
+                segment_idx += 1
+                
+                segments.append(SubtitleSegment(
+                    index=segment_idx,
+                    start=start,
+                    end=end,
+                    text=text
+                ))
+                continue
+            except:
+                pass
+        
+        i += 1
     
     return segments
+
+
+def parse_vietsub_dual_format(srt_path: Path) -> List[Tuple[SubtitleSegment, str]]:
+    """
+    Parse vietsub file in format:
+        00:00:00,000 --> 00:00:08,000
+        原文 (Trung)
+        译文 (Viet)
+    
+    Returns list of (segment, viet_translation) tuples.
+    """
+    from dataclasses import dataclass
+    
+    @dataclass
+    class SubtitleSegment:
+        index: int
+        start: float
+        end: float
+        text: str
+    
+    if not srt_path.exists():
+        raise FileNotFoundError(f"SRT file not found: {srt_path}")
+    
+    content = srt_path.read_text(encoding="utf-8")
+    lines = content.strip().split("\n")
+    
+    result = []
+    i = 0
+    idx = 0
+    
+    while i < len(lines):
+        line = lines[i].strip()
+        
+        # Timestamp line
+        if " --> " in line:
+            try:
+                idx += 1
+                start_str, end_str = line.split(" --> ")
+                start = parse_timestamp(start_str)
+                end = parse_timestamp(end_str)
+                
+                # Next non-empty line is original (Trung)
+                i += 1
+                original = ""
+                while i < len(lines) and not lines[i].strip():
+                    i += 1
+                if i < len(lines):
+                    original = lines[i].strip()
+                
+                # Next non-empty line is translation (Viet)
+                i += 1
+                viet = ""
+                while i < len(lines) and not lines[i].strip():
+                    i += 1
+                if i < len(lines):
+                    viet = lines[i].strip()
+                
+                result.append((
+                    SubtitleSegment(index=idx, start=start, end=end, text=original),
+                    viet
+                ))
+                i += 1
+                continue
+            except Exception as e:
+                logger.warning(f"Parse error at line {i}: {e}")
+        
+        i += 1
+    
+    return result
 
 
 class TimingInfo:
