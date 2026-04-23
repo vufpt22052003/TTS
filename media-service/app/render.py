@@ -183,23 +183,46 @@ class RenderService:
                 logger.error(f"[COMBINE] TTS file not found: {tts_path}")
                 raise Exception(f"TTS file not found for segment {i}: {tts_path}")
 
+            # Calculate delay in milliseconds to place this TTS at correct start time
+            delay_ms = int(seg_start * 1000)
+
             # Debug: log segment info
             file_size = Path(tts_path).stat().st_size if Path(tts_path).exists() else 0
             print(f"[COMBINE] Segment {i}: start={seg_start:.2f}s, delay={delay_ms}ms, file={tts_path}, size={file_size} bytes")
 
-            # Calculate delay in milliseconds to place this TTS at correct start time
-            delay_ms = int(seg_start * 1000)
+            # Skip empty TTS files - create silent placeholder
+            if file_size == 0:
+                logger.warning(f"[COMBINE] Empty TTS file, creating silence: {tts_path}")
+                temp_delayed = output_path.parent / f"temp_delayed_{i:03d}.mp3"
+                silent_dur = max(tts_dur, 0.1)
+                silent_cmd = [
+                    '-f', 'lavfi',
+                    '-i', f'anullsrc=r=44100:cl=stereo',
+                    '-t', str(silent_dur),
+                    '-acodec', 'libmp3lame',
+                    '-ab', '192k',
+                    str(temp_delayed).replace('\\', '/')
+                ]
+                success, _, _ = self._run_ffmpeg(silent_cmd)
+                if success:
+                    delayed_files.append(temp_delayed)
+                    continue
+                else:
+                    logger.error(f"[COMBINE] Failed to create silence for segment {i}")
+                    continue
+
             temp_delayed = output_path.parent / f"temp_delayed_{i:03d}.mp3"
             delayed_files.append(temp_delayed)
 
             # Use adelay to offset TTS to exact start position (in ms)
+            # Also boost volume to match video audio better
             # Convert backslashes to forward slashes for FFmpeg
             tts_path_str = str(tts_path).replace('\\', '/')
             temp_delayed_str = str(temp_delayed).replace('\\', '/')
             
             cmd = [
                 '-i', tts_path_str,
-                '-af', f'adelay={delay_ms}|{delay_ms}',
+                '-af', f'volume=1.5,adelay={delay_ms}|{delay_ms}',
                 '-acodec', 'libmp3lame',
                 '-ab', '192k',
                 temp_delayed_str  # _run_ffmpeg already adds -y
@@ -232,11 +255,13 @@ class RenderService:
                 raise Exception(f"Failed to delay segment {i}: {actual_error}")
 
         # Mix all delayed TTS tracks into one audio
+        # amix normalize=0 to prevent volume reduction, then boost after
         mix_cmd = ['-i', str(delayed_files[0])]
         for f in delayed_files[1:]:
             mix_cmd.extend(['-i', str(f)])
         mix_cmd.extend([
-            '-filter_complex', f'amix=inputs={len(delayed_files)}:duration=longest:dropout_transition=0',
+            '-filter_complex', f'amix=inputs={len(delayed_files)}:duration=longest:dropout_transition=0:normalize=0[out];[out]volume={min(len(delayed_files), 20) * 1.5}[aout]',
+            '-map', '[aout]',
             '-acodec', 'libmp3lame',
             '-ab', '192k',
             '-y',

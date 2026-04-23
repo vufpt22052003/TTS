@@ -1,8 +1,9 @@
 import os
 import uuid
 import logging
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Any
 from datetime import datetime
 
 from app.config import settings
@@ -137,26 +138,17 @@ def get_tts_voice_for_language(lang: str) -> str:
     return voice_map.get(lang_base, 'vi-VN-HoaiMyNeural')
 
 
-def parse_srt_file(srt_path: Path, has_dual_lang: bool = False) -> List['SubtitleSegment']:
-    """
-    Parse SRT file and return list of SubtitleSegment dataclass.
-    
-    Args:
-        srt_path: Path to SRT file
-        has_dual_lang: If True, expects format:
-            00:00:00,000 --> 00:00:08,000
-            原文 (Trung)
-            译文 (Viet)
-    """
-    from dataclasses import dataclass
-    
-    @dataclass
-    class SubtitleSegment:
-        index: int
-        start: float
-        end: float
-        text: str
-    
+@dataclass
+class SubtitleSegment:
+    """Subtitle segment data structure."""
+    index: int
+    start: float
+    end: float
+    text: str
+
+
+def parse_srt_file(srt_path: Path) -> List[SubtitleSegment]:
+    """Parse SRT file and return list of SubtitleSegment."""
     if not srt_path.exists():
         raise FileNotFoundError(f"SRT file not found: {srt_path}")
     
@@ -210,15 +202,6 @@ def parse_vietsub_dual_format(srt_path: Path) -> List[Tuple[SubtitleSegment, str
     
     Returns list of (segment, viet_translation) tuples.
     """
-    from dataclasses import dataclass
-    
-    @dataclass
-    class SubtitleSegment:
-        index: int
-        start: float
-        end: float
-        text: str
-    
     if not srt_path.exists():
         raise FileNotFoundError(f"SRT file not found: {srt_path}")
     
@@ -232,7 +215,6 @@ def parse_vietsub_dual_format(srt_path: Path) -> List[Tuple[SubtitleSegment, str
     while i < len(lines):
         line = lines[i].strip()
         
-        # Timestamp line
         if " --> " in line:
             try:
                 idx += 1
@@ -240,7 +222,6 @@ def parse_vietsub_dual_format(srt_path: Path) -> List[Tuple[SubtitleSegment, str
                 start = parse_timestamp(start_str)
                 end = parse_timestamp(end_str)
                 
-                # Next non-empty line is original (Trung)
                 i += 1
                 original = ""
                 while i < len(lines) and not lines[i].strip():
@@ -248,7 +229,6 @@ def parse_vietsub_dual_format(srt_path: Path) -> List[Tuple[SubtitleSegment, str
                 if i < len(lines):
                     original = lines[i].strip()
                 
-                # Next non-empty line is translation (Viet)
                 i += 1
                 viet = ""
                 while i < len(lines) and not lines[i].strip():
