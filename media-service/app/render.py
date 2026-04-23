@@ -478,39 +478,59 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         print(f"[RENDER] subtitle_track={subtitle_track}, subtitle_path={subtitle_path}, exists={subtitle_path.exists() if subtitle_path else 'N/A'}")
 
         if subtitle_track and subtitle_path.exists():
-            escaped_path = str(subtitle_path).replace('\\', '/').replace(':', '\\\\:')
+            # Convert SRT to professional ASS subtitle
+            try:
+                from app.utils import parse_srt_file, create_ass_subtitle_file
 
-            cmd = [
-                '-i', str(video_path),
-                '-vf', f"subtitles={escaped_path}:force_style='FontSize=28'",
-                '-c:a', 'copy',
-                str(temp_video)
-            ]
+                # Parse original SRT
+                srt_segments = parse_srt_file(subtitle_path)
 
-            success, _, stderr = self._run_ffmpeg(cmd)
+                # Create ASS with professional styling
+                ass_path = output_path.parent / "temp_subtitles.ass"
+                ass_segments = [(s.start, s.end, s.text) for s in srt_segments]
+                create_ass_subtitle_file(ass_segments, ass_path, style="professional")
 
-            if not success:
-                ass_path = f"file={subtitle_path.as_posix()}"
+                escaped_path = str(ass_path).replace('\\', '/').replace(':', '\\\\:')
                 cmd = [
                     '-i', str(video_path),
-                    '-vf', f"subtitles={ass_path}",
+                    '-vf', f"subtitles={escaped_path}",
                     '-c:a', 'copy',
                     str(temp_video)
                 ]
+
                 success, _, stderr = self._run_ffmpeg(cmd)
 
-            if not success:
-                cmd = [
-                    '-i', str(video_path),
-                    '-vf', f"subtitles='{subtitle_path.as_posix()}'",
-                    '-c:a', 'copy',
-                    str(temp_video)
-                ]
-                success, _, stderr = self._run_ffmpeg(cmd)
+                if not success:
+                    # Fallback: try different path format
+                    ass_path_str = f"file={ass_path.as_posix()}"
+                    cmd = [
+                        '-i', str(video_path),
+                        '-vf', f"subtitles={ass_path_str}",
+                        '-c:a', 'copy',
+                        str(temp_video)
+                    ]
+                    success, _, stderr = self._run_ffmpeg(cmd)
 
-            if not success:
-                warnings.append(f"Subtitle burn-in failed")
-                logger.warning(f"Could not add subtitles: {stderr[:200]}")
+                if not success:
+                    logger.warning(f"ASS subtitle failed, trying SRT: {stderr[:200]}")
+                    # Final fallback to SRT with improved styling
+                    escaped_srt = str(subtitle_path).replace('\\', '/').replace(':', '\\\\:')
+                    cmd = [
+                        '-i', str(video_path),
+                        '-vf', f"subtitles={escaped_srt}:force_style='FontSize=24,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H80000000,BorderStyle=1,Outline=1,Shadow=2'",
+                        '-c:a', 'copy',
+                        str(temp_video)
+                    ]
+                    success, _, stderr = self._run_ffmpeg(cmd)
+
+                if not success:
+                    warnings.append(f"Subtitle burn-in failed")
+                    logger.warning(f"Could not add subtitles: {stderr[:200]}")
+                    import shutil
+                    shutil.copy(video_path, temp_video)
+
+            except Exception as e:
+                logger.error(f"Subtitle conversion error: {e}")
                 import shutil
                 shutil.copy(video_path, temp_video)
         else:
@@ -526,16 +546,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 temp_mixed = output_path.parent / "temp_mixed_audio.mp3"
                 temp_outputs.append(temp_mixed)
 
-                # Mix base audio (lowered) with voiceover at user-specified volume
-                orig_vol = 0.3  # Keep original audio at 30%
+                # Mix base audio (very low) with voiceover
+                # Use dynaudnorm to prevent clipping and reduce noise
+                orig_vol = 0.15  # Keep original audio very low (15%)
                 cmd = [
                     '-i', str(temp_video),
                     '-i', str(base_audio),
                     '-i', str(voiceover_path),
                     '-filter_complex',
-                    f'[1:a]volume={orig_vol}[orig];[2:a]volume={voiceover_volume}[voiced];[orig][voiced]amix=inputs=2:duration=longest[aout]',
+                    f'[1:a]volume={orig_vol}[orig];[2:a]volume={voiceover_volume}[voiced];[orig][voiced]amix=inputs=2:duration=longest:normalize=0[mixed];[mixed]dynaudnorm[cleaned]',
                     '-map', '0:v',
-                    '-map', '[aout]',
+                    '-map', '[cleaned]',
                     '-c:v', 'copy',
                     '-c:a', 'aac',
                     '-b:a', '192k',

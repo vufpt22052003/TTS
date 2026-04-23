@@ -4,991 +4,886 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TTS Video Processor</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                    },
+                }
+            }
         }
-
+    </script>
+    <style>
+        * { scroll-behavior: smooth; }
+        
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            background: linear-gradient(180deg, #030712 0%, #0f172a 50%, #030712 100%);
             min-height: 100vh;
-            color: #f1f5f9;
         }
 
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 40px 20px;
+        /* ===== ANIMATIONS ===== */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
-        header {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-
-        header h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #60a5fa, #a78bfa);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: 
-            margin-bottom: 8px;
-        }
-
-        header p {
-            color: #94a3b8;
-            font-size: 1rem;
-        }
-
-        .card {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(148, 163, 184, 0.1);
-            border-radius: 16px;
-            padding: 32px;
-            margin-bottom: 24px;
-        }
-
-        .card-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 24px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .card-title svg {
-            width: 24px;
-            height: 24px;
-            color: #60a5fa;
-        }
-
-        .upload-zone {
-            border: 2px dashed #475569;
-            border-radius: 12px;
-            padding: 48px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: rgba(15, 23, 42, 0.5);
-        }
-
-        .upload-zone:hover {
-            border-color: #60a5fa;
-            background: rgba(96, 165, 250, 0.1);
-        }
-
-        .upload-zone.dragover {
-            border-color: #60a5fa;
-            background: rgba(96, 165, 250, 0.15);
-        }
-
-        .upload-zone svg {
-            width: 48px;
-            height: 48px;
-            color: #60a5fa;
-            margin-bottom: 16px;
-        }
-
-        .upload-zone p {
-            color: #94a3b8;
-            margin-bottom: 8px;
-        }
-
-        .upload-zone .highlight {
-            color: #60a5fa;
-            font-weight: 500;
-        }
-
-        .file-input {
-            display: none;
-        }
-
-        .selected-file {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            padding: 16px;
-            background: rgba(15, 23, 42, 0.6);
-            border-radius: 12px;
-            margin-top: 20px;
-        }
-
-        .selected-file svg {
-            width: 40px;
-            height: 40px;
-            color: #60a5fa;
-        }
-
-        .selected-file .file-info {
-            flex: 1;
-        }
-
-        .selected-file .file-name {
-            font-weight: 500;
-            color: #f1f5f9;
-        }
-
-        .selected-file .file-size {
-            font-size: 0.875rem;
-            color: #64748b;
-        }
-
-        .selected-file .remove-file {
-            padding: 8px;
-            border-radius: 8px;
-            border: none;
-            background: rgba(239, 68, 68, 0.2);
-            color: #ef4444;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .selected-file .remove-file:hover {
-            background: rgba(239, 68, 68, 0.3);
-        }
-
-        .btn-small {
-            padding: 6px 12px;
-            border-radius: 6px;
-            border: none;
-            background: rgba(59, 130, 246, 0.2);
-            color: #60a5fa;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.85rem;
-        }
-
-        .btn-small:hover {
-            background: rgba(59, 130, 246, 0.3);
-        }
-
-        .form-group {
-            margin-bottom: 24px;
-        }
-
-        .form-group label {
-            display: block;
-            font-weight: 500;
-            margin-bottom: 8px;
-            color: #e2e8f0;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-        }
-
-        select, input[type="text"], input[type="number"] {
-            width: 100%;
-            padding: 12px 16px;
-            border-radius: 8px;
-            border: 1px solid #475569;
-            background: rgba(15, 23, 42, 0.6);
-            color: #f1f5f9;
-            font-size: 1rem;
-            transition: all 0.2s;
-        }
-
-        select:focus, input:focus {
-            outline: none;
-            border-color: #60a5fa;
-            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
-        }
-
-        .checkbox-group {
-            display: flex;
-            gap: 32px;
-        }
-
-        .checkbox-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-        }
-
-        .checkbox-item input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            accent-color: #60a5fa;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            padding: 14px 28px;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: none;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-            color: white;
-            width: 100%;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .btn-primary .spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-top-color: white;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        .btn-download-url {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 12px 20px;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: none;
-            background: linear-gradient(135deg, #8b5cf6, #a855f7);
-            color: white;
-        }
-
-        .btn-download-url:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
-        }
-
-        .btn-download-url:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
 
-        /* Progress Section */
-        .progress-section {
-            display: none;
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
         }
 
-        .progress-section.active {
-            display: block;
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
         }
 
-        .progress-steps {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
+        @keyframes glow-pulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.4); }
+            50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.7); }
         }
 
-        .progress-step {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            padding: 16px;
-            background: rgba(15, 23, 42, 0.5);
-            border-radius: 12px;
-            transition: all 0.3s;
+        @keyframes checkmark {
+            0% { stroke-dashoffset: 24; }
+            100% { stroke-dashoffset: 0; }
         }
 
-        .progress-step.active {
-            background: rgba(96, 165, 250, 0.15);
-            border: 1px solid rgba(96, 165, 250, 0.3);
+        @keyframes scaleIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
         }
 
-        .progress-step.completed {
-            background: rgba(34, 197, 94, 0.15);
+        .animate-fade-in-up { animation: fadeInUp 0.4s ease-out forwards; }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        .animate-pulse { animation: pulse 1.5s ease-in-out infinite; }
+        .animate-spin { animation: spin 0.8s linear infinite; }
+        .animate-bounce { animation: bounce 2s ease-in-out infinite; }
+        .animate-shimmer {
+            background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.08) 50%, transparent 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        .animate-scale-in { animation: scaleIn 0.3s ease-out forwards; }
+
+        /* ===== GLASS EFFECT ===== */
+        .glass {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(148, 163, 184, 0.08);
         }
 
-        .progress-step.error {
-            background: rgba(239, 68, 68, 0.15);
+        .gradient-text {
+            background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #f472b6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
+        /* ===== GLOW EFFECTS ===== */
+        .glow-blue { box-shadow: 0 0 60px rgba(59, 130, 246, 0.25); }
+        .glow-purple { box-shadow: 0 0 60px rgba(139, 92, 246, 0.25); }
+        .glow-green { box-shadow: 0 0 40px rgba(34, 197, 94, 0.4); }
+        .glow-active { animation: glow-pulse 1.5s ease-in-out infinite; }
+
+        /* ===== UPLOAD ZONE ===== */
+        .upload-zone {
+            border: 2px dashed rgba(148, 163, 184, 0.2);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.6) 0%, rgba(15, 23, 42, 0.3) 100%);
+        }
+        .upload-zone:hover {
+            border-color: rgba(96, 165, 250, 0.5);
+            background: linear-gradient(180deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.02) 100%);
+            transform: scale(1.005);
+        }
+        .upload-zone.dragover {
+            border-color: #3b82f6;
+            background: linear-gradient(180deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%);
+            transform: scale(1.02);
+            box-shadow: 0 0 40px rgba(59, 130, 246, 0.2);
+        }
+
+        /* ===== BUTTONS ===== */
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #6366f1 50%, #8b5cf6 100%);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 25px 50px rgba(59, 130, 246, 0.35);
+        }
+        .btn-primary:active:not(:disabled) { transform: scale(0.98); }
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-primary.loading {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        }
+
+        .btn-secondary {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            transition: all 0.2s ease;
+        }
+        .btn-secondary:hover {
+            background: rgba(51, 65, 85, 0.8);
+            border-color: rgba(148, 163, 184, 0.25);
+        }
+
+        .btn-accent {
+            background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-accent:hover:not(:disabled) {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(139, 92, 246, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-success:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(34, 197, 94, 0.3);
+        }
+
+        /* ===== INPUTS ===== */
+        input:focus, select:focus {
+            outline: none;
+            border-color: rgba(96, 165, 250, 0.5);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        /* ===== PROGRESS STEPS ===== */
+        .step-item {
+            position: relative;
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+        .step-item:hover { background: rgba(255, 255, 255, 0.02); }
+        
+        .step-item:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            left: 24px;
+            top: 56px;
+            width: 2px;
+            height: calc(100% - 40px);
+            background: rgba(148, 163, 184, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        /* Pending */
+        .step-item.pending .step-icon {
+            background: rgba(71, 85, 105, 0.4);
+        }
+        .step-item.pending .step-icon svg { color: #64748b; }
+
+        /* Active - SỐNG ĐỘNG */
+        .step-item.active {
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+        }
+        .step-item.active:not(:last-child)::after {
+            background: linear-gradient(180deg, rgba(59, 130, 246, 0.8) 0%, rgba(148, 163, 184, 0.1) 100%);
+        }
+        .step-item.active .step-icon {
+            background: #3b82f6 !important;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+            animation: glow-pulse 1.5s ease-in-out infinite;
+        }
+        .step-item.active .step-icon svg { color: white !important; }
+        .step-item.active .step-name { color: #93c5fd; }
+
+        /* Completed - HOÀN TẤT */
+        .step-item.completed {
+            background: rgba(34, 197, 94, 0.05);
+            border: 1px solid rgba(34, 197, 94, 0.15);
+        }
+        .step-item.completed:not(:last-child)::after {
+            background: linear-gradient(180deg, rgba(34, 197, 94, 0.6) 0%, rgba(34, 197, 94, 0.1) 100%);
+        }
+        .step-item.completed .step-icon {
+            background: #22c55e !important;
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.3);
+        }
+        .step-item.completed .step-icon svg { color: white !important; }
+        .step-item.completed .step-name { color: #86efac; }
+        .step-item.completed .step-check {
+            stroke-dasharray: 24;
+            stroke-dashoffset: 24;
+            animation: checkmark 0.4s ease-out forwards;
+        }
+
+        /* Error */
+        .step-item.error {
+            background: rgba(239, 68, 68, 0.05);
+            border: 1px solid rgba(239, 68, 68, 0.15);
+        }
+        .step-item.error .step-icon {
+            background: #ef4444 !important;
+        }
+        .step-item.error .step-name { color: #fca5a5; }
+
+        /* ===== STEP ICONS ===== */
         .step-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(71, 85, 105, 0.5);
-            color: #94a3b8;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
         }
 
-        .progress-step.active .step-icon {
-            background: #3b82f6;
-            color: white;
-            animation: pulse 1.5s infinite;
+        /* ===== VIDEO STATES ===== */
+        .video-container {
+            background: linear-gradient(180deg, #0a0a0f 0%, #000 100%);
+            border: 1px solid rgba(148, 163, 184, 0.05);
         }
 
-        .progress-step.completed .step-icon {
-            background: #22c55e;
-            color: white;
+        .video-skeleton {
+            background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
         }
 
-        .progress-step.error .step-icon {
-            background: #ef4444;
-            color: white;
+        /* ===== PROGRESS BAR ===== */
+        .progress-bar {
+            height: 4px;
+            background: rgba(148, 163, 184, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            border-radius: 2px;
+            transition: width 0.5s ease;
         }
 
-        @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
-            50% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+        /* ===== CARD ===== */
+        .card {
+            background: linear-gradient(180deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.4) 100%);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(148, 163, 184, 0.08);
+            transition: all 0.3s ease;
+        }
+        .card:hover { border-color: rgba(148, 163, 184, 0.12); }
+
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.35); }
+
+        /* ===== BADGE ===== */
+        .badge {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.2) 100%);
+            border: 1px solid rgba(139, 92, 246, 0.3);
         }
 
-        .step-icon svg {
-            width: 20px;
-            height: 20px;
-        }
-
-        .step-info {
-            flex: 1;
-        }
-
-        .step-name {
-            font-weight: 500;
-            margin-bottom: 4px;
-        }
-
-        .step-status {
-            font-size: 0.875rem;
-            color: #64748b;
-        }
-
-        /* Result Section */
-        .result-section {
-            display: none;
-        }
-
-        .result-section.active {
-            display: block;
-        }
-
-        .result-card {
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(139, 92, 246, 0.2));
-            border: 1px solid rgba(34, 197, 94, 0.3);
-            border-radius: 16px;
-            padding: 32px;
-            text-align: center;
-        }
-
-        .result-card.error {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1));
-            border-color: rgba(239, 68, 68, 0.3);
-        }
-
-        .result-icon {
-            width: 64px;
-            height: 64px;
-            border-radius: 50%;
-            background: #22c55e;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 20px;
-        }
-
-        .result-card.error .result-icon {
-            background: #ef4444;
-        }
-
-        .result-icon svg {
-            width: 32px;
-            height: 32px;
-            color: white;
-        }
-
-        .result-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-
-        .result-message {
-            color: #94a3b8;
-            margin-bottom: 24px;
-        }
-
-        /* Subtitle Preview */
-        .subtitle-preview {
-            margin-top: 24px;
-            max-height: 400px;
-            overflow-y: auto;
-            background: rgba(15, 23, 42, 0.6);
-            border-radius: 12px;
-            padding: 16px;
-        }
-
-        .subtitle-preview h4 {
-            color: #a78bfa;
-            margin-bottom: 16px;
-            font-size: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .subtitle-compare-header {
-            display: grid;
-            grid-template-columns: 100px 1fr 1fr;
-            gap: 16px;
-            padding: 8px 12px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #64748b;
-            text-transform: uppercase;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-            margin-bottom: 8px;
-        }
-
-        .subtitle-compare-header .col-original {
-            color: #f97316;
-        }
-
-        .subtitle-compare-header .col-translated {
-            color: #22c55e;
-        }
-
+        /* ===== SUBTITLE ROWS ===== */
         .subtitle-row {
-            display: grid;
-            grid-template-columns: 100px 1fr 1fr;
-            gap: 16px;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            background: rgba(30, 41, 59, 0.5);
-            transition: all 0.2s;
+            transition: all 0.15s ease;
+            cursor: pointer;
         }
-
-        .subtitle-row:hover {
-            background: rgba(96, 165, 250, 0.15);
-        }
-
+        .subtitle-row:hover { background: rgba(59, 130, 246, 0.12) !important; }
         .subtitle-row.active {
-            background: rgba(96, 165, 250, 0.2);
-            border: 1px solid rgba(96, 165, 250, 0.3);
+            background: rgba(59, 130, 246, 0.2) !important;
+            border-color: rgba(59, 130, 246, 0.3) !important;
         }
 
-        .subtitle-time {
-            font-family: monospace;
-            font-size: 0.85rem;
-            color: #60a5fa;
-            padding-top: 2px;
-        }
-
-        .subtitle-original {
-            color: #f97316;
-            line-height: 1.5;
-            font-size: 0.9rem;
-            opacity: 0.85;
-        }
-
-        .subtitle-translated {
-            color: #22c55e;
-            line-height: 1.5;
-            font-size: 0.95rem;
-            font-weight: 500;
-        }
-
-        .subtitle-text {
-            color: #e2e8f0;
-            line-height: 1.5;
-            font-size: 0.95rem;
-        }
-
-        .no-subtitle {
-            text-align: center;
-            color: #64748b;
-            padding: 40px;
-        }
-
-        .download-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            padding: 14px 32px;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: 600;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            color: white;
-            text-decoration: none;
+        /* ===== RANGE SLIDER ===== */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
             cursor: pointer;
-            border: none;
-            transition: all 0.2s;
         }
-
-        .download-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(34, 197, 94, 0.4);
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 6px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            border-radius: 3px;
         }
-
-        /* Error message */
-        .error-message {
-            background: rgba(239, 68, 68, 0.15);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            border-radius: 12px;
-            padding: 16px;
-            color: #fca5a5;
-            margin-top: 16px;
-            display: none;
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #fff;
+            border-radius: 50%;
+            margin-top: -6px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: transform 0.15s ease;
         }
+        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
 
-        .error-message.active {
+        /* ===== CHECKBOX ===== */
+        input[type="checkbox"] {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 2px solid rgba(148, 163, 184, 0.3);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        input[type="checkbox"]:checked {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border-color: transparent;
+        }
+        input[type="checkbox"]:checked::after {
+            content: '';
             display: block;
+            width: 5px;
+            height: 9px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg) translate(3px, -1px);
         }
 
-        /* Job History */
-        .job-history {
-            margin-top: 40px;
+        /* ===== TOOLTIP ===== */
+        .tooltip {
+            position: relative;
+        }
+        .tooltip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-8px);
+            padding: 6px 12px;
+            background: #1e293b;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            font-size: 12px;
+            color: #e2e8f0;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            z-index: 100;
+        }
+        .tooltip:hover::after {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(-4px);
         }
 
-        .job-item {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            padding: 16px;
-            background: rgba(15, 23, 42, 0.5);
-            border-radius: 12px;
-            margin-bottom: 12px;
-        }
-
-        .job-item svg {
-            width: 24px;
-            height: 24px;
-            color: #60a5fa;
-        }
-
-        .job-info {
-            flex: 1;
-        }
-
-        .job-name {
-            font-weight: 500;
-        }
-
-        .job-time {
-            font-size: 0.875rem;
-            color: #64748b;
-        }
-
-        .job-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .job-btn {
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-size: 0.875rem;
-            font-weight: 500;
-            cursor: pointer;
-            border: none;
-            transition: all 0.2s;
-        }
-
-        .job-btn.view {
-            background: rgba(96, 165, 250, 0.2);
-            color: #60a5fa;
-        }
-
-        .job-btn.view:hover {
-            background: rgba(96, 165, 250, 0.3);
-        }
-
-        .job-btn.download {
-            background: rgba(34, 197, 94, 0.2);
-            color: #22c55e;
-        }
-
-        .job-btn.download:hover {
-            background: rgba(34, 197, 94, 0.3);
-        }
-
-        /* Notification */
+        /* ===== NOTIFICATION ===== */
         .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 16px 24px;
-            border-radius: 12px;
-            background: #22c55e;
-            color: white;
-            font-weight: 500;
-            z-index: 1000;
-            animation: slideIn 0.3s ease;
+            animation: fadeInUp 0.3s ease-out;
         }
-
-        .notification.error {
-            background: #ef4444;
-        }
-
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
         }
-
-        .hidden {
-            display: none !important;
-        }
     </style>
 </head>
-<body>
-    <div class="container">
-        <header>
-            <h1>TTS Video Processor</h1>
-            <p>Upload video để thêm phụ đề tiếng Việt và lồng tiếng</p>
-        </header>
-
-        <!-- Upload Section -->
-        <div class="card" id="uploadSection">
-            <h2 class="card-title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="17,8 12,3 7,8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-                Upload Video
-            </h2>
-
-            <!-- URL Input -->
-            <div class="form-group">
-                <label for="videoUrl">Hoặc dán link video</label>
-                <div style="display: flex; gap: 12px;">
-                    <input type="text" id="videoUrl" placeholder="Dán link YouTube, TikTok, Twitter..." style="flex: 1;">
-                    <button class="btn-download-url" onclick="downloadFromUrl()">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+<body class="text-slate-200 antialiased">
+    <!-- Sticky Header -->
+    <header class="sticky top-0 z-50 glass border-b border-slate-800/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
+                        <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8 5v14l11-7z"/>
                         </svg>
-                        Tải
-                    </button>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold gradient-text">TTS Video Processor</h1>
+                    </div>
                 </div>
-                <p style="font-size: 0.75rem; color: #64748b; margin-top: 6px;">Hỗ trợ: YouTube, TikTok, Twitter, Facebook, và nhiều nền tảng khác</p>
-            </div>
-
-            <div style="text-align: center; margin: 20px 0; color: #475569;">— hoặc —</div>
-
-            <div class="upload-zone" id="uploadZone">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="17,8 12,3 7,8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-                <p>Kéo thả video vào đây hoặc <span class="highlight">chọn tệp</span></p>
-                <p style="font-size: 0.875rem;">Hỗ trợ: MP4, AVI, MOV, MKV</p>
-                <input type="file" class="file-input" id="fileInput" accept="video/*">
-            </div>
-
-            <div class="selected-file hidden" id="selectedFile">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="23 7 16 12 23 17 23 7"/>
-                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-                </svg>
-                <div class="file-info">
-                    <div class="file-name" id="fileName">video.mp4</div>
-                    <div class="file-size" id="fileSize">0 MB</div>
+                <div class="flex items-center gap-4">
+                    <div class="badge px-3 py-1.5 rounded-full flex items-center gap-2">
+                        <span class="relative flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                        </span>
+                        <span class="text-xs font-medium text-slate-300">AI Powered</span>
+                    </div>
                 </div>
-                <button class="btn-small" id="downloadOriginalBtn" onclick="downloadOriginal()">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="7 10 12 15 17 10"/>
-                        <line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                    Tải gốc
-                </button>
-                <button class="remove-file" onclick="removeFile()">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                </button>
             </div>
+        </div>
+    </header>
 
-            <div class="error-message" id="uploadError"></div>
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="grid lg:grid-cols-5 gap-8">
             
-            <!-- Vietsub Upload -->
-            <div style="margin-top: 20px; padding: 20px; background: rgba(139, 92, 246, 0.1); border-radius: 12px; border: 1px dashed #8b5cf6;">
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#a78bfa" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                        <line x1="16" y1="13" x2="8" y2="13"/>
-                        <line x1="16" y1="17" x2="8" y2="17"/>
-                    </svg>
-                    <span style="font-weight: 500; color: #a78bfa;">Upload phụ đề Việt (SRT) - Tùy chọn</span>
-                </div>
-                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 12px;">
-                    Nếu có file phụ đề tiếng Việt (.srt), upload ở đây để sử dụng thay vì STT. 
-                    Đảm bảo timing chính xác, không lỗi.
-                </p>
-                <input type="file" id="vietsubInput" accept=".srt" style="display: none;" onchange="handleVietsubSelect(this)">
-                <button class="btn-small" onclick="document.getElementById('vietsubInput').click()" style="background: rgba(139, 92, 246, 0.2); color: #a78bfa;">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="17 8 12 3 7 8"/>
-                        <line x1="12" y1="3" x2="12" y2="15"/>
-                    </svg>
-                    Chọn file .srt
-                </button>
-                <div id="vietsubStatus" style="margin-top: 10px; font-size: 0.85rem;"></div>
-            </div>
-        </div>
-
-        <!-- Settings Section -->
-        <div class="card" id="settingsSection">
-            <h2 class="card-title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                </svg>
-                Cài đặt
-            </h2>
-
-            <div class="form-row">
-                <!-- Ngôn ngữ cố định: tự động nhận diện → tiếng Việt -->
-                <div class="form-group" style="display: none;">
-                    <select id="sourceLang">
-                        <option value="auto" selected>Tự động nhận diện</option>
-                    </select>
-                    <select id="targetLang">
-                        <option value="vi" selected>Tiếng Việt</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="voice">Giọng đọc</label>
-                <select id="voice">
-                    <option value="vi-VN-HoaiMyNeural" selected>Việt Nam - Hoài My (Nữ)</option>
-                    <option value="vi-VN-NamMinhNeural">Việt Nam - Nam Minh (Nam)</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label>Tùy chọn</label>
-                <div class="checkbox-group">
-                    <label class="checkbox-item">
-                        <input type="checkbox" id="addSubtitles" checked>
-                        <span>Thêm phụ đề</span>
-                    </label>
-                    <label class="checkbox-item">
-                        <input type="checkbox" id="addVoiceover" checked>
-                        <span>Lồng tiếng</span>
-                    </label>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="voiceoverVolume">Âm lượng lồng tiếng: <span id="volumeValue">80</span>%</label>
-                <input type="range" id="voiceoverVolume" min="0" max="100" value="80" style="width: 100%;">
-            </div>
-        </div>
-
-        <!-- Process Button -->
-        <button class="btn btn-primary" id="processBtn" onclick="processVideo()">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="5 3 19 12 5 21 5 3"/>
-            </svg>
-            Bắt đầu xử lý
-        </button>
-
-        <!-- Progress Section -->
-        <div class="card progress-section" id="progressSection">
-            <h2 class="card-title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <polyline points="12 6 12 12 16 14"/>
-                </svg>
-                Đang xử lý...
-            </h2>
-
-            <div class="progress-steps">
-                <div class="progress-step" id="step-upload">
-                    <div class="step-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="17,8 12,3 7,8"/>
-                            <line x1="12" y1="3" x2="12" y2="15"/>
-                        </svg>
-                    </div>
-                    <div class="step-info">
-                        <div class="step-name">Upload video</div>
-                        <div class="step-status">Đang tải lên...</div>
-                    </div>
-                </div>
-                <div class="progress-step" id="step-transcribe">
-                    <div class="step-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                            <line x1="12" y1="19" x2="12" y2="23"/>
-                            <line x1="8" y1="23" x2="16" y2="23"/>
-                        </svg>
-                    </div>
-                    <div class="step-info">
-                        <div class="step-name">Transcribe (STT)</div>
-                        <div class="step-status">Đang chuyển giọng nói thành text...</div>
-                    </div>
-                </div>
-                <div class="progress-step" id="step-translate">
-                    <div class="step-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M5 8l6 6"/>
-                            <path d="M4 14l6-6 2-3"/>
-                            <path d="M2 5h12"/>
-                            <path d="M7 2h1"/>
-                            <path d="M22 22l-5-10-5 10"/>
-                            <path d="M14 18h6"/>
-                        </svg>
-                    </div>
-                    <div class="step-info">
-                        <div class="step-name">Dịch phụ đề</div>
-                        <div class="step-status">Đang dịch sang tiếng Việt...</div>
-                    </div>
-                </div>
-                <div class="progress-step" id="step-tts">
-                    <div class="step-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-                            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-                        </svg>
-                    </div>
-                    <div class="step-info">
-                        <div class="step-name">Tạo giọng đọc (TTS)</div>
-                        <div class="step-status">Đang tạo audio...</div>
-                    </div>
-                </div>
-                <div class="progress-step" id="step-render">
-                    <div class="step-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
-                            <line x1="7" y1="2" x2="7" y2="22"/>
-                            <line x1="17" y1="2" x2="17" y2="22"/>
-                            <line x1="2" y1="12" x2="22" y2="12"/>
-                            <line x1="2" y1="7" x2="7" y2="7"/>
-                            <line x1="2" y1="17" x2="7" y2="17"/>
-                            <line x1="17" y1="17" x2="22" y2="17"/>
-                            <line x1="17" y1="7" x2="22" y2="7"/>
-                        </svg>
-                    </div>
-                    <div class="step-info">
-                        <div class="step-name">Render video</div>
-                        <div class="step-status">Đang ghép video...</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Result Section -->
-        <div class="card result-section" id="resultSection">
-            <div class="result-card" id="resultCard">
-                <div class="result-icon" id="resultIcon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                </div>
-                <h3 class="result-title" id="resultTitle">Xử lý hoàn tất!</h3>
-                <p class="result-message" id="resultMessage">Video của bạn đã sẵn sàng để tải về.</p>
+            <!-- LEFT COLUMN -->
+            <div class="lg:col-span-2 space-y-6">
                 
-                <!-- Video Preview -->
-                <div id="videoPreview" style="display: none; margin: 20px 0;">
-                    <video id="resultVideo" controls style="width: 100%; max-height: 400px; border-radius: 12px; background: #000;">
-                        Your browser does not support the video tag.
-                    </video>
-                </div>
-
-                <!-- Subtitle Preview -->
-                <div id="subtitlePreview" style="display: none; margin-top: 24px;">
-                    <div class="subtitle-preview" id="subtitleContainer">
-                        <h4>
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
-                                <line x1="7" y1="2" x2="7" y2="22"/>
-                                <line x1="17" y1="2" x2="17" y2="22"/>
-                                <line x1="2" y1="12" x2="22" y2="12"/>
+                <!-- Upload Card -->
+                <div class="card rounded-2xl p-6 animate-fade-in-up" style="animation-delay: 0.05s;">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17,8 12,3 7,8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
                             </svg>
-                            Phụ đề đã dịch
-                        </h4>
-                        <div id="subtitleList"></div>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-slate-100">Upload Video</h2>
+                            <p class="text-xs text-slate-500">Kéo thả hoặc chọn file</p>
+                        </div>
+                    </div>
+
+                    <!-- URL Input -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-slate-400 mb-2">Link video</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="videoUrl" 
+                                class="flex-1 px-4 py-2.5 bg-slate-900/60 border border-slate-700/50 rounded-xl text-slate-100 placeholder-slate-500 text-sm"
+                                placeholder="YouTube, TikTok, Twitter...">
+                            <button onclick="downloadFromUrl()" class="btn-accent px-4 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center gap-2 whitespace-nowrap">
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                <span>Tải</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Divider -->
+                    <div class="flex items-center gap-3 my-4">
+                        <div class="flex-1 h-px bg-slate-700/40"></div>
+                        <span class="text-xs text-slate-500 uppercase tracking-wider">hoặc</span>
+                        <div class="flex-1 h-px bg-slate-700/40"></div>
+                    </div>
+
+                    <!-- Upload Zone -->
+                    <div class="upload-zone rounded-xl p-8 text-center cursor-pointer" id="uploadZone">
+                        <input type="file" class="hidden" id="fileInput" accept="video/*">
+                        <div class="animate-bounce mb-4">
+                            <div class="w-14 h-14 mx-auto rounded-2xl bg-blue-500/15 border border-blue-500/20 flex items-center justify-center">
+                                <svg class="w-7 h-7 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="17,8 12,3 7,8"/>
+                                    <line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <p class="text-slate-300 text-sm mb-1">Kéo thả video vào đây</p>
+                        <p class="text-xs text-slate-500">MP4, AVI, MOV, MKV</p>
+                    </div>
+
+                    <!-- Selected File -->
+                    <div class="hidden mt-4 p-3 bg-slate-900/50 rounded-xl border border-slate-700/30" id="selectedFile">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="23 7 16 12 23 17 23 7"/>
+                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="font-medium text-slate-100 text-sm truncate" id="fileName">video.mp4</p>
+                                <p class="text-xs text-slate-500" id="fileSize">0 MB</p>
+                            </div>
+                            <button id="downloadOriginalBtn" onclick="downloadOriginal()" 
+                                class="px-3 py-1.5 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-xs text-slate-300 transition-colors">
+                                Gốc
+                            </button>
+                            <button onclick="removeFile()" class="p-1.5 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-red-400 transition-colors">
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"/>
+                                    <line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Error -->
+                    <div class="hidden mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm" id="uploadError"></div>
+
+                    <!-- SRT Upload -->
+                    <div class="mt-4 p-4 bg-purple-500/5 border border-purple-500/15 rounded-xl">
+                        <div class="flex items-center gap-3 mb-2">
+                            <div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                                <svg class="w-4 h-4 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    <polyline points="14 2 14 8 20 8"/>
+                                </svg>
+                            </div>
+                            <span class="text-sm font-medium text-purple-300">Phụ đề Việt (.srt)</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mb-3">Tùy chọn: dùng phụ đề có sẵn thay vì STT</p>
+                        <input type="file" id="vietsubInput" accept=".srt" class="hidden" onchange="handleVietsubSelect(this)">
+                        <button onclick="document.getElementById('vietsubInput').click()" 
+                            class="px-3 py-2 bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 rounded-lg text-xs font-medium transition-colors flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                            Chọn file .srt
+                        </button>
+                        <div id="vietsubStatus" class="mt-2 text-xs"></div>
                     </div>
                 </div>
+
+                <!-- Settings Card -->
+                <div class="card rounded-2xl p-6 animate-fade-in-up" style="animation-delay: 0.1s;">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-slate-100">Cài đặt</h2>
+                            <p class="text-xs text-slate-500">Tùy chỉnh video đầu ra</p>
+                        </div>
+                    </div>
+
+                    <select id="sourceLang" class="hidden"><option value="auto" selected>Tự động</option></select>
+                    <select id="targetLang" class="hidden"><option value="vi" selected>Tiếng Việt</option></select>
+
+                    <div class="mb-5">
+                        <label class="block text-sm font-medium text-slate-400 mb-2">Giọng đọc</label>
+                        <select id="voice" class="w-full px-4 py-2.5 bg-slate-900/60 border border-slate-700/50 rounded-xl text-slate-100 text-sm">
+                            <option value="vi-VN-HoaiMyNeural">🎀 Hoài My (Nữ)</option>
+                            <option value="vi-VN-NamMinhNeural">🎤 Nam Minh (Nam)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-5">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-sm font-medium text-slate-400">Âm lượng lồng tiếng</label>
+                            <span id="volumeValue" class="text-sm font-bold text-blue-400">80%</span>
+                        </div>
+                        <input type="range" id="voiceoverVolume" min="0" max="100" value="80" class="w-full">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-3">Tùy chọn</label>
+                        <div class="space-y-3">
+                            <label class="flex items-center gap-3 cursor-pointer group">
+                                <input type="checkbox" id="addSubtitles" checked>
+                                <span class="text-sm text-slate-300 group-hover:text-white transition-colors">Thêm phụ đề</span>
+                            </label>
+                            <label class="flex items-center gap-3 cursor-pointer group">
+                                <input type="checkbox" id="addVoiceover" checked>
+                                <span class="text-sm text-slate-300 group-hover:text-white transition-colors">Lồng tiếng</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Process Button -->
+                <button id="processBtn" onclick="processVideo()" 
+                    class="btn-primary w-full py-4 rounded-2xl text-white font-bold text-base flex items-center justify-center gap-3 animate-fade-in-up" 
+                    style="animation-delay: 0.15s;">
+                    <svg id="processBtnIcon" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    <span id="processBtnText">Bắt đầu xử lý</span>
+                </button>
+            </div>
+
+            <!-- RIGHT COLUMN -->
+            <div class="lg:col-span-3 space-y-6">
                 
-                <!-- Action Buttons -->
-                <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-                    <button class="download-btn" id="openBtn" onclick="openVideo()" style="background: linear-gradient(135deg, #8b5cf6, #a855f7);">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                            <polygon points="5 3 19 12 5 21 5 3"/>
+                <!-- Video Preview Card -->
+                <div class="card rounded-2xl overflow-hidden animate-fade-in-up" style="animation-delay: 0.2s;" id="videoPreviewCard">
+                    <div class="p-4 border-b border-slate-800/50">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polygon points="23 7 16 12 23 17 23 7"/>
+                                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2 class="text-lg font-semibold text-slate-100">Video Preview</h2>
+                                    <p class="text-xs text-slate-500">Xem trước kết quả</p>
+                                </div>
+                            </div>
+                            <div id="videoStatusBadge" class="hidden">
+                                <span class="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-medium rounded-lg">Sẵn sàng</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="video-container p-4">
+                        <!-- Empty State -->
+                        <div id="videoEmpty" class="aspect-video flex flex-col items-center justify-center text-center">
+                            <div class="w-20 h-20 rounded-2xl bg-slate-800/50 flex items-center justify-center mb-4">
+                                <svg class="w-10 h-10 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <polygon points="23 7 16 12 23 17 23 7"/>
+                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                                </svg>
+                            </div>
+                            <p class="text-slate-500 text-sm">Video sẽ hiển thị ở đây</p>
+                            <p class="text-slate-600 text-xs mt-1">Sau khi xử lý hoàn tất</p>
+                        </div>
+
+                        <!-- Processing State -->
+                        <div id="videoProcessing" class="hidden aspect-video flex flex-col items-center justify-center text-center">
+                            <div class="w-20 h-20 rounded-2xl bg-blue-500/10 flex items-center justify-center mb-4">
+                                <svg class="w-10 h-10 text-blue-400 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
+                                    <path d="M12 2a10 10 0 0 1 10 10"/>
+                                </svg>
+                            </div>
+                            <p class="text-blue-400 text-sm font-medium">Đang render video...</p>
+                            <p class="text-slate-500 text-xs mt-1">Vui lòng chờ trong giây lát</p>
+                        </div>
+
+                        <!-- Video Element -->
+                        <video id="resultVideo" controls class="hidden w-full rounded-xl bg-black">
+                            Trình duyệt không hỗ trợ video.
+                        </video>
+                    </div>
+                    <div id="videoActions" class="hidden p-4 border-t border-slate-800/50 flex flex-wrap gap-3">
+                        <button onclick="openVideo()" id="openBtn" 
+                            class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium text-slate-300 flex items-center gap-2">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                            Mở video
+                        </button>
+                        <a id="downloadBtn" href="#" download
+                            class="btn-success px-4 py-2 rounded-xl text-white text-sm font-semibold flex items-center gap-2 no-underline">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Tải về
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Processing Status Card -->
+                <div class="card rounded-2xl p-6 animate-fade-in-up hidden" id="progressSection">
+                    <!-- Header với Progress -->
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                                <svg id="progressSpinner" class="w-5 h-5 text-blue-400 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
+                                    <path d="M12 2a10 10 0 0 1 10 10"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h2 class="text-lg font-semibold text-slate-100">Đang xử lý</h2>
+                                <p class="text-xs text-slate-500" id="processingTime">Bắt đầu xử lý...</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-2xl font-bold text-blue-400" id="progressPercent">0%</div>
+                            <div class="text-xs text-slate-500">Hoàn thành</div>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="progress-bar mb-6">
+                        <div class="progress-bar-fill" id="progressBarFill" style="width: 0%"></div>
+                    </div>
+
+                    <!-- Steps Timeline -->
+                    <div class="space-y-1" id="stepsContainer">
+                        <!-- Step: Upload -->
+                        <div class="step-item pending flex items-center gap-4 p-3 rounded-xl border border-transparent" id="step-upload" data-step="1" data-name="Upload video" data-tooltip="Tải video lên server">
+                            <div class="step-icon">
+                                <svg id="step-upload-icon" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="17,8 12,3 7,8"/>
+                                    <line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-medium step-name">Upload video</p>
+                                <p class="text-sm text-slate-500 step-status"></p>
+                            </div>
+                        </div>
+
+                        <!-- Step: Transcribe -->
+                        <div class="step-item pending flex items-center gap-4 p-3 rounded-xl border border-transparent" id="step-transcribe" data-step="2" data-name="Transcribe (STT)" data-tooltip="Chuyển giọng nói thành văn bản">
+                            <div class="step-icon">
+                                <svg id="step-transcribe-icon" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                                    <line x1="12" y1="19" x2="12" y2="23"/>
+                                    <line x1="8" y1="23" x2="16" y2="23"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-medium step-name">Transcribe (STT)</p>
+                                <p class="text-sm text-slate-500 step-status"></p>
+                            </div>
+                        </div>
+
+                        <!-- Step: Translate -->
+                        <div class="step-item pending flex items-center gap-4 p-3 rounded-xl border border-transparent" id="step-translate" data-step="3" data-name="Dịch phụ đề" data-tooltip="Dịch phụ đề sang tiếng Việt">
+                            <div class="step-icon">
+                                <svg id="step-translate-icon" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M5 8l6 6"/>
+                                    <path d="M4 14l6-6 2-3"/>
+                                    <path d="M2 5h12"/>
+                                    <path d="M7 2h1"/>
+                                    <path d="M22 22l-5-10-5 10"/>
+                                    <path d="M14 18h6"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-medium step-name">Dịch phụ đề</p>
+                                <p class="text-sm text-slate-500 step-status"></p>
+                            </div>
+                        </div>
+
+                        <!-- Step: TTS -->
+                        <div class="step-item pending flex items-center gap-4 p-3 rounded-xl border border-transparent" id="step-tts" data-step="4" data-name="Tạo giọng đọc (TTS)" data-tooltip="Tạo audio từ văn bản">
+                            <div class="step-icon">
+                                <svg id="step-tts-icon" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-medium step-name">Tạo giọng đọc (TTS)</p>
+                                <p class="text-sm text-slate-500 step-status"></p>
+                            </div>
+                        </div>
+
+                        <!-- Step: Render -->
+                        <div class="step-item pending flex items-center gap-4 p-3 rounded-xl border border-transparent" id="step-render" data-step="5" data-name="Render video" data-tooltip="Ghép video, phụ đề và audio">
+                            <div class="step-icon">
+                                <svg id="step-render-icon" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+                                    <line x1="7" y1="2" x2="7" y2="22"/>
+                                    <line x1="17" y1="2" x2="17" y2="22"/>
+                                    <line x1="2" y1="12" x2="22" y2="12"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-medium step-name">Render video</p>
+                                <p class="text-sm text-slate-500 step-status"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Subtitle Preview Card -->
+                <div class="card rounded-2xl overflow-hidden animate-fade-in-up hidden" id="subtitlePreview">
+                    <div class="p-4 border-b border-slate-800/50">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+                                    <line x1="7" y1="2" x2="7" y2="22"/>
+                                    <line x1="17" y1="2" x2="17" y2="22"/>
+                                    <line x1="2" y1="12" x2="22" y2="12"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h2 class="text-lg font-semibold text-slate-100">Phụ đề</h2>
+                                <p class="text-xs text-slate-500">So sánh original & dịch</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="max-h-96 overflow-y-auto">
+                        <div id="subtitleList" class="p-4 space-y-2"></div>
+                    </div>
+                </div>
+
+                <!-- Success State -->
+                <div class="card rounded-2xl p-8 text-center hidden animate-scale-in glow-green" id="resultSuccess">
+                    <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                        <svg class="w-10 h-10 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <polyline points="20 6 9 17 4 12"/>
                         </svg>
-                        Mở video
-                    </button>
-                    <a class="download-btn" id="downloadBtn" href="#" download>
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/>
-                            <line x1="12" y1="15" x2="12" y2="3"/>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-100 mb-2">Xử lý hoàn tất!</h3>
+                    <p class="text-slate-400 text-sm">Video của bạn đã sẵn sàng để tải về</p>
+                </div>
+
+                <!-- Error State -->
+                <div class="card rounded-2xl p-8 text-center hidden" id="resultError">
+                    <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center">
+                        <svg class="w-10 h-10 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
                         </svg>
-                        Tải video về
-                    </a>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-100 mb-2">Xử lý thất bại</h3>
+                    <p class="text-red-400 text-sm" id="resultMessage"></p>
                 </div>
             </div>
         </div>
-    </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/50 mt-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center text-sm text-slate-500">
+            <p>TTS Video Processor — AI-powered video translation & voiceover</p>
+        </div>
+    </footer>
+
+    <!-- Notification Container -->
+    <div id="notificationContainer" class="fixed top-20 right-4 z-50 space-y-3"></div>
 
     <script>
+        // ===== STATE =====
         let selectedFile = null;
         let jobId = null;
         let isUrlDownloading = false;
+        let isProcessing = false;
         const API_BASE = 'http://localhost:8080';
-        
-        // Vietsub file storage
         let selectedVietsub = null;
-        
+        let resultVideo = null;
+        let processingStartTime = null;
+        let elapsedTimeInterval = null;
+
+        // ===== VIETSUB =====
         function handleVietsubSelect(input) {
             const file = input.files[0];
             if (!file) return;
-            
             if (!file.name.endsWith('.srt')) {
-                document.getElementById('vietsubStatus').innerHTML = '<span style="color: #ef4444;">Chỉ chấp nhận file .srt</span>';
+                document.getElementById('vietsubStatus').innerHTML = '<span class="text-red-400">Chỉ chấp nhận file .srt</span>';
                 return;
             }
-            
             selectedVietsub = file;
             document.getElementById('vietsubStatus').innerHTML = `
-                <span style="color: #22c55e;">✓ Đã chọn: ${file.name} (${formatFileSize(file.size)})</span>
-                <button onclick="clearVietsub()" style="margin-left: 10px; background: none; border: none; color: #ef4444; cursor: pointer;">Xóa</button>
+                <span class="text-green-400 flex items-center gap-2">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    ${file.name} (${formatFileSize(file.size)})
+                </span>
+                <button onclick="clearVietsub()" class="ml-2 text-red-400 hover:text-red-300 text-xs">Xóa</button>
             `;
         }
         
@@ -998,39 +893,25 @@
             document.getElementById('vietsubStatus').innerHTML = '';
         }
 
-        // Volume slider
+        // ===== VOLUME =====
         document.getElementById('voiceoverVolume').addEventListener('input', (e) => {
             document.getElementById('volumeValue').textContent = e.target.value;
         });
 
-        // Upload zone
+        // ===== UPLOAD ZONE =====
         const uploadZone = document.getElementById('uploadZone');
         const fileInput = document.getElementById('fileInput');
 
         uploadZone.addEventListener('click', () => fileInput.click());
-
-        uploadZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadZone.classList.add('dragover');
-        });
-
-        uploadZone.addEventListener('dragleave', () => {
-            uploadZone.classList.remove('dragover');
-        });
-
+        uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+        uploadZone.addEventListener('dragleave', () => { uploadZone.classList.remove('dragover'); });
         uploadZone.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadZone.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFileSelect(files[0]);
-            }
+            if (e.dataTransfer.files.length > 0) handleFileSelect(e.dataTransfer.files[0]);
         });
-
         fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                handleFileSelect(e.target.files[0]);
-            }
+            if (e.target.files.length > 0) handleFileSelect(e.target.files[0]);
         });
 
         function handleFileSelect(file) {
@@ -1038,7 +919,6 @@
                 showError('Vui lòng chọn file video!');
                 return;
             }
-
             selectedFile = file;
             document.getElementById('fileName').textContent = file.name;
             document.getElementById('fileSize').textContent = formatFileSize(file.size);
@@ -1057,11 +937,7 @@
         }
 
         function downloadOriginal() {
-            if (!jobId) {
-                showError('Không có video để tải!');
-                return;
-            }
-            // Create temporary anchor with download attribute for proper filename
+            if (!jobId) { showError('Không có video để tải!'); return; }
             const link = document.createElement('a');
             link.href = `${API_BASE}/download-original/${jobId}`;
             link.download = `video_${jobId}.mp4`;
@@ -1077,25 +953,16 @@
             return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
         }
 
+        // ===== DOWNLOAD FROM URL =====
         async function downloadFromUrl() {
             const urlInput = document.getElementById('videoUrl');
             const url = urlInput.value.trim();
-            
-            if (!url) {
-                showError('Vui lòng nhập link video!');
-                return;
-            }
-
-            // Validate URL - simple check
-            if (!url.startsWith('http')) {
-                showError('Link phải bắt đầu bằng http hoặc https!');
-                return;
-            }
+            if (!url) { showError('Vui lòng nhập link video!'); return; }
+            if (!url.startsWith('http')) { showError('Link phải bắt đầu bằng http hoặc https!'); return; }
+            if (isUrlDownloading) return;
 
             isUrlDownloading = true;
-            const btn = document.querySelector('.btn-download-url');
-            btn.disabled = true;
-            btn.innerHTML = '<div class="spinner"></div> Đang tải...';
+            disableAllButtons();
             hideError();
 
             try {
@@ -1112,114 +979,191 @@
 
                 const data = await response.json();
                 
-                // CRITICAL: Verify file_size is reasonable (> 1MB)
                 if (!data.file_size || data.file_size < 1_000_000) {
-                    throw new Error(`Download failed: file too small (${data.file_size || 0} bytes) - likely invalid`);
+                    throw new Error(`File quá nhỏ (${data.file_size || 0} bytes) - có thể link không hợp lệ`);
                 }
                 
-                // Update UI
                 selectedFile = { name: 'video.mp4', size: data.file_size };
-                document.getElementById('fileName').textContent = `Video từ: ${url.substring(0, 50)}...`;
+                document.getElementById('fileName').textContent = `Video: ${url.substring(0, 40)}...`;
                 document.getElementById('fileSize').textContent = formatFileSize(data.file_size);
                 document.getElementById('selectedFile').classList.remove('hidden');
                 document.getElementById('uploadZone').classList.add('hidden');
-                document.getElementById('uploadError').classList.remove('active');
                 
                 jobId = data.job_id;
-                showNotification(`Download hoàn tất! (${formatFileSize(data.file_size)}) Video đã sẵn sàng xử lý.`, 'success');
+                isUrlDownloading = false;
+                // Buttons stay disabled - processVideo will handle them next
+                showNotification(`Download hoàn tất! (${formatFileSize(data.file_size)})`);
 
             } catch (error) {
-                showError('Download thất bại: ' + error.message);
-            } finally {
                 isUrlDownloading = false;
-                btn.disabled = false;
-                btn.innerHTML = `
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                    </svg>
-                    Tải
-                `;
+                enableAllButtons();
+                showError('Download thất bại: ' + error.message);
             }
         }
 
-        function showNotification(message, type = 'info') {
+        // ===== NOTIFICATIONS =====
+        function showNotification(message, type = 'success') {
+            const container = document.getElementById('notificationContainer');
             const notification = document.createElement('div');
-            notification.className = 'notification' + (type === 'error' ? ' error' : '');
-            notification.textContent = message;
-            document.body.appendChild(notification);
+            notification.className = `notification px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium ${
+                type === 'error' ? 'bg-red-500/95 text-white' : 'bg-green-500/95 text-white'
+            }`;
+            
+            notification.innerHTML = type === 'success' 
+                ? `<svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><span>${message}</span>`
+                : `<svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>${message}</span>`;
+            
+            container.appendChild(notification);
             
             setTimeout(() => {
-                notification.remove();
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(20px)';
+                notification.style.transition = 'all 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
             }, 4000);
         }
 
         function showError(message) {
             const errorEl = document.getElementById('uploadError');
-            errorEl.textContent = message;
-            errorEl.classList.add('active');
+            errorEl.innerHTML = `<span>${message}</span>`;
+            errorEl.classList.remove('hidden');
         }
 
         function hideError() {
-            document.getElementById('uploadError').classList.remove('active');
+            document.getElementById('uploadError').classList.add('hidden');
         }
 
+        // ===== STEP FUNCTIONS =====
         function setStepComplete(stepId) {
             const step = document.getElementById(stepId);
-            step.classList.remove('active');
+            step.classList.remove('pending', 'active');
             step.classList.add('completed');
             step.querySelector('.step-icon').innerHTML = `
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="20 6 9 17 4 12"/>
+                <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline class="step-check" points="20 6 9 17 4 12"/>
                 </svg>
             `;
-            step.querySelector('.step-status').textContent = 'Hoàn tất';
+            step.querySelector('.step-status').textContent = '✓ Hoàn tất';
         }
 
         function setStepActive(stepId) {
             const step = document.getElementById(stepId);
+            step.classList.remove('pending');
             step.classList.add('active');
-            step.querySelector('.step-status').textContent = 'Đang xử lý...';
+            step.querySelector('.step-status').innerHTML = `<span class="text-blue-400">Đang xử lý...</span>`;
+            step.querySelector('.step-icon').innerHTML = `
+                <div class="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            `;
+            updateProgress();
         }
 
         function setStepError(stepId, message) {
             const step = document.getElementById(stepId);
+            step.classList.remove('pending', 'active');
             step.classList.add('error');
             step.querySelector('.step-status').textContent = message || 'Lỗi';
+            step.querySelector('.step-icon').innerHTML = `
+                <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            `;
         }
 
         function resetProgress() {
             const steps = ['upload', 'transcribe', 'translate', 'tts', 'render'];
-            steps.forEach(step => {
+            const stepNames = ['Upload video', 'Transcribe (STT)', 'Dịch phụ đề', 'Tạo giọng đọc (TTS)', 'Render video'];
+            const defaultIcons = [
+                '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>',
+                '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>',
+                '<path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/>',
+                '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>',
+                '<rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/>'
+            ];
+            
+            steps.forEach((step, idx) => {
                 const el = document.getElementById('step-' + step);
                 el.classList.remove('active', 'completed', 'error');
-                el.querySelector('.step-icon').innerHTML = '';
+                el.classList.add('pending');
+                el.querySelector('.step-icon').innerHTML = `<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${defaultIcons[idx]}</svg>`;
                 el.querySelector('.step-status').textContent = '';
             });
-        }
-
-        function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = 'notification' + (type === 'error' ? ' error' : '');
-            notification.textContent = message;
-            document.body.appendChild(notification);
             
-            setTimeout(() => {
-                notification.remove();
-            }, 4000);
+            document.getElementById('progressPercent').textContent = '0%';
+            document.getElementById('progressBarFill').style.width = '0%';
+            document.getElementById('processingTime').textContent = 'Bắt đầu xử lý...';
         }
 
+        function updateProgress() {
+            const steps = ['upload', 'transcribe', 'translate', 'tts', 'render'];
+            let completed = 0;
+            
+            steps.forEach(step => {
+                const el = document.getElementById('step-' + step);
+                if (el.classList.contains('completed')) completed++;
+                if (el.classList.contains('active')) completed += 0.5;
+            });
+            
+            const percent = Math.round((completed / steps.length) * 100);
+            document.getElementById('progressPercent').textContent = percent + '%';
+            document.getElementById('progressBarFill').style.width = percent + '%';
+        }
+
+        function startElapsedTime() {
+            processingStartTime = Date.now();
+            elapsedTimeInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - processingStartTime) / 1000);
+                const mins = Math.floor(elapsed / 60);
+                const secs = elapsed % 60;
+                document.getElementById('processingTime').textContent = 
+                    `Đang xử lý... (~${mins > 0 ? mins + 'm ' : ''}${secs}s)`;
+            }, 1000);
+        }
+
+        function stopElapsedTime() {
+            if (elapsedTimeInterval) {
+                clearInterval(elapsedTimeInterval);
+                elapsedTimeInterval = null;
+            }
+        }
+
+        // ===== HELPER: Disable both buttons =====
+        function disableAllButtons() {
+            const downloadBtn = document.querySelector('.btn-accent');
+            const processBtn = document.getElementById('processBtn');
+            downloadBtn.disabled = true;
+            processBtn.disabled = true;
+            downloadBtn.innerHTML = '<div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Đang tải...';
+            processBtn.innerHTML = '<div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> <span>Đang tải...</span>';
+        }
+
+        // ===== HELPER: Enable both buttons =====
+        function enableAllButtons() {
+            const downloadBtn = document.querySelector('.btn-accent');
+            const processBtn = document.getElementById('processBtn');
+            downloadBtn.disabled = false;
+            processBtn.disabled = false;
+            downloadBtn.innerHTML = `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Tải</span>`;
+            processBtn.innerHTML = `<svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>Bắt đầu xử lý</span>`;
+        }
+
+        // ===== PROCESS VIDEO =====
         async function processVideo() {
+            // Prevent spam clicks - check EARLY
+            if (isProcessing || isUrlDownloading) {
+                console.log('Already processing, ignoring click');
+                return;
+            }
+            
             const urlInput = document.getElementById('videoUrl');
             const url = urlInput.value.trim();
             
-            // If no file selected and no jobId, try to download from URL
+            // Check if we need to download from URL first
             if (!selectedFile && !jobId && url) {
+                // Set flag IMMEDIATELY before anything else
+                isUrlDownloading = true;
+                disableAllButtons();
                 showNotification('Đang tải video từ link...', 'info');
-                
-                const downloadBtn = document.querySelector('.btn-download-url');
-                downloadBtn.disabled = true;
-                downloadBtn.innerHTML = '<div class="spinner"></div> Đang tải...';
                 
                 try {
                     const response = await fetch(`${API_BASE}/download-url`, {
@@ -1242,11 +1186,13 @@
                     document.getElementById('uploadZone').classList.add('hidden');
                     
                     jobId = data.job_id;
-                    showNotification('Download hoàn tất! Bắt đầu xử lý...', 'success');
+                    isUrlDownloading = false;
+                    isProcessing = true;
+                    showNotification('Download hoàn tất! Bắt đầu xử lý...');
                     
                 } catch (error) {
-                    downloadBtn.disabled = false;
-                    downloadBtn.innerHTML = 'Tải';
+                    isUrlDownloading = false;
+                    enableAllButtons();
                     showError('Download thất bại: ' + error.message);
                     return;
                 }
@@ -1257,19 +1203,36 @@
                 return;
             }
             
+            // Mark as processing
+            isProcessing = true;
+            
             // Reset UI
             resetProgress();
-            document.getElementById('resultSection').classList.remove('active');
-            document.getElementById('progressSection').classList.add('active');
-            document.getElementById('processBtn').disabled = true;
+            document.getElementById('resultSuccess').classList.add('hidden');
+            document.getElementById('resultError').classList.add('hidden');
+            document.getElementById('subtitlePreview').classList.add('hidden');
+            document.getElementById('videoActions').classList.add('hidden');
+            document.getElementById('videoEmpty').classList.add('hidden');
+            document.getElementById('videoProcessing').classList.remove('hidden');
+            document.getElementById('resultVideo').classList.add('hidden');
+            document.getElementById('videoStatusBadge').classList.add('hidden');
+            document.getElementById('progressSection').classList.remove('hidden');
+            document.getElementById('progressSection').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // CTA Loading State
+            const processBtn = document.getElementById('processBtn');
+            processBtn.disabled = true;
+            processBtn.classList.add('loading');
+            processBtn.innerHTML = '<div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> <span>Đang xử lý...</span>';
+            
             hideError();
+            startElapsedTime();
 
             try {
-                // If jobId exists (from URL), skip upload step
+                // Step 1: Upload
                 if (jobId) {
                     setStepComplete('step-upload');
                 } else {
-                    // Upload file first
                     setStepActive('step-upload');
                     const formData = new FormData();
                     formData.append('file', selectedFile);
@@ -1297,8 +1260,6 @@
                         const err = await vietsubRes.json();
                         throw new Error('Upload vietsub thất bại: ' + err.detail);
                     }
-                    const vietsubData = await vietsubRes.json();
-                    console.log(`Uploaded vietsub with ${vietsubData.segments} segments`);
                 }
 
                 // Step 2: Process
@@ -1317,7 +1278,7 @@
 
                 if (!processRes.ok) throw new Error('Xử lý thất bại');
 
-                // Simulate progress updates (in real app, use WebSocket or polling)
+                // Simulate steps
                 setStepActive('step-transcribe');
                 await delay(2000);
                 setStepComplete('step-transcribe');
@@ -1334,61 +1295,61 @@
                 await delay(2000);
                 setStepComplete('step-render');
 
-                // Show result
                 showResult(true, jobId);
 
             } catch (error) {
                 console.error('Error:', error);
                 showResult(false, error.message);
             } finally {
-                document.getElementById('processBtn').disabled = false;
+                stopElapsedTime();
+                isProcessing = false;
+                enableAllButtons();
             }
         }
 
         function showResult(success, jobId) {
-            const section = document.getElementById('resultSection');
-            const card = document.getElementById('resultCard');
-            const title = document.getElementById('resultTitle');
-            const message = document.getElementById('resultMessage');
+            const progressSection = document.getElementById('progressSection');
+            const resultSuccess = document.getElementById('resultSuccess');
+            const resultError = document.getElementById('resultError');
+            const videoEmpty = document.getElementById('videoEmpty');
+            const videoProcessing = document.getElementById('videoProcessing');
+            const resultVideoEl = document.getElementById('resultVideo');
+            const videoActions = document.getElementById('videoActions');
+            const videoStatusBadge = document.getElementById('videoStatusBadge');
             const downloadBtn = document.getElementById('downloadBtn');
-            const openBtn = document.getElementById('openBtn');
-            const videoPreview = document.getElementById('videoPreview');
-            const resultVideo = document.getElementById('resultVideo');
-            const resultIcon = document.getElementById('resultIcon');
+            const progressSpinner = document.getElementById('progressSpinner');
 
             if (success) {
-                card.classList.remove('error');
-                resultIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`;
-                title.textContent = 'Xử lý hoàn tất!';
-                message.textContent = 'Video của bạn đã sẵn sàng để tải về.';
+                progressSection.classList.add('hidden');
+                resultSuccess.classList.remove('hidden');
+                resultError.classList.add('hidden');
                 
-                // Set video URL
+                // Update video preview
+                videoEmpty.classList.add('hidden');
+                videoProcessing.classList.add('hidden');
+                resultVideoEl.classList.remove('hidden');
+                videoActions.classList.remove('hidden');
+                videoStatusBadge.classList.remove('hidden');
+                
                 const videoUrl = `${API_BASE}/download/${jobId}`;
+                resultVideoEl.src = videoUrl;
+                resultVideo = resultVideoEl;
+                
                 downloadBtn.href = videoUrl;
                 downloadBtn.setAttribute("download", `video_${jobId}.mp4`);
-                downloadBtn.style.display = 'inline-flex';
-                openBtn.style.display = 'inline-flex';
                 
-                // Show video preview
-                videoPreview.style.display = 'block';
-                resultVideo.src = videoUrl;
-
-                // Load and display subtitles
                 loadSubtitles(jobId);
-
-                // Store jobId for openVideo function
                 window.currentJobId = jobId;
+                
+                document.getElementById('videoPreviewCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
             } else {
-                card.classList.add('error');
-                resultIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
-                title.textContent = 'Xử lý thất bại';
-                message.textContent = jobId;
-                downloadBtn.style.display = 'none';
-                openBtn.style.display = 'none';
-                videoPreview.style.display = 'none';
+                progressSection.classList.add('hidden');
+                videoProcessing.classList.add('hidden');
+                videoEmpty.classList.remove('hidden');
+                resultSuccess.classList.add('hidden');
+                resultError.classList.remove('hidden');
+                document.getElementById('resultMessage').textContent = jobId;
             }
-
-            section.classList.add('active');
         }
         
         function openVideo() {
@@ -1401,15 +1362,14 @@
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
+        // ===== SUBTITLES =====
         async function loadSubtitles(jobId) {
             try {
-                // Use compare endpoint to show both original and translated
                 const response = await fetch(`${API_BASE}/subtitles-compare/${jobId}`);
                 if (!response.ok) {
-                    // Fallback to old endpoint
                     const fallback = await fetch(`${API_BASE}/subtitles/${jobId}`);
                     if (!fallback.ok) {
-                        document.getElementById('subtitlePreview').style.display = 'none';
+                        document.getElementById('subtitlePreview').classList.add('hidden');
                         return;
                     }
                     const fallbackData = await fallback.json();
@@ -1419,7 +1379,7 @@
 
                 const data = await response.json();
                 if (!data.segments || data.segments.length === 0) {
-                    document.getElementById('subtitlePreview').style.display = 'none';
+                    document.getElementById('subtitlePreview').classList.add('hidden');
                     return;
                 }
 
@@ -1427,44 +1387,45 @@
 
             } catch (error) {
                 console.error('Failed to load subtitles:', error);
-                document.getElementById('subtitlePreview').style.display = 'none';
+                document.getElementById('subtitlePreview').classList.add('hidden');
             }
         }
 
         function displaySubtitles(segments, showCompare) {
             const container = document.getElementById('subtitleList');
             container.innerHTML = '';
+            document.getElementById('subtitlePreview').classList.remove('hidden');
 
             if (showCompare) {
-                // Add header row for compare mode
                 const header = document.createElement('div');
-                header.className = 'subtitle-compare-header';
+                header.className = 'grid grid-cols-12 gap-3 px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-700/30 mb-2';
                 header.innerHTML = `
-                    <div class="col-time">Time</div>
-                    <div class="col-original">Original</div>
-                    <div class="col-translated">Translated</div>
+                    <div class="col-span-2">Time</div>
+                    <div class="col-span-5 text-orange-400">Original</div>
+                    <div class="col-span-5 text-green-400">Dịch</div>
                 `;
                 container.appendChild(header);
             }
 
             segments.forEach((seg, idx) => {
                 const row = document.createElement('div');
-                row.className = 'subtitle-row';
+                row.className = 'subtitle-row grid gap-3 p-3 rounded-xl border border-transparent';
                 row.dataset.start = seg.start;
                 row.dataset.end = seg.end;
                 row.dataset.index = idx;
 
                 if (showCompare) {
+                    row.classList.add('grid-cols-12');
                     row.innerHTML = `
-                        <div class="subtitle-time">${seg.start_str}</div>
-                        <div class="subtitle-original">${escapeHtml(seg.original || seg.text || '')}</div>
-                        <div class="subtitle-translated">${escapeHtml(seg.translated || seg.text || '')}</div>
+                        <div class="col-span-2 font-mono text-xs text-blue-400 py-1">${seg.start_str}</div>
+                        <div class="col-span-5 text-orange-300/80 text-sm leading-relaxed">${escapeHtml(seg.original || seg.text || '')}</div>
+                        <div class="col-span-5 text-green-300 text-sm leading-relaxed font-medium">${escapeHtml(seg.translated || seg.text || '')}</div>
                     `;
                 } else {
+                    row.classList.add('grid-cols-12');
                     row.innerHTML = `
-                        <div class="subtitle-time">${seg.start_str} - ${seg.end_str}</div>
-                        <div class="subtitle-text">${escapeHtml(seg.text)}</div>
-                        <div class="subtitle-text"></div>
+                        <div class="col-span-2 font-mono text-xs text-blue-400 py-1">${seg.start_str} - ${seg.end_str}</div>
+                        <div class="col-span-10 text-slate-300 text-sm leading-relaxed">${escapeHtml(seg.text)}</div>
                     `;
                 }
 
@@ -1480,7 +1441,6 @@
                 container.appendChild(row);
             });
 
-            // Sync video time with subtitles
             if (resultVideo) {
                 resultVideo.addEventListener('timeupdate', () => {
                     const currentTime = resultVideo.currentTime;
@@ -1496,8 +1456,6 @@
                     });
                 });
             }
-
-            document.getElementById('subtitlePreview').style.display = 'block';
         }
 
         function escapeHtml(text) {

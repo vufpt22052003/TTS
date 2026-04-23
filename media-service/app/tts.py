@@ -33,7 +33,31 @@ VOICE_MAP = {
     'zh': 'zh-CN',
     'ja': 'ja',
     'ko': 'ko',
+    'fr': 'fr',
+    'de': 'de',
+    'es': 'es',
+    'pt': 'pt',
+    'ru': 'ru',
+    'ar': 'ar',
+    'th': 'th',
+    'id': 'id',
+    'ms': 'ms',
 }
+
+
+def extract_gtts_lang(voice: str) -> str:
+    """Extract gTTS language code from voice name like 'vi-VN-HoaiMyNeural' -> 'vi'"""
+    if not voice:
+        return 'vi'
+    
+    # Handle Azure voice names like 'vi-VN-HoaiMyNeural'
+    if '-' in voice:
+        lang_part = voice.split('-')[0].lower()
+        if lang_part in VOICE_MAP:
+            return VOICE_MAP[lang_part]
+    
+    # Handle direct codes like 'vi', 'en', 'zh-CN'
+    return VOICE_MAP.get(voice.lower(), voice)
 
 
 class TTSService:
@@ -45,7 +69,7 @@ class TTSService:
     def _get_voice_for_language(self, language: str = 'vi') -> str:
         """Get appropriate voice for language."""
         if self.voice:
-            return self.voice
+            return extract_gtts_lang(self.voice)
         return VOICE_MAP.get(language, 'vi')
 
     def _get_audio_duration(self, audio_path: Path) -> float:
@@ -75,8 +99,10 @@ class TTSService:
         """Generate TTS for all segments."""
         output_dir.mkdir(parents=True, exist_ok=True)
         target_lang = voice or self._get_voice_for_language(language)
+        # Extract gTTS lang code from voice name
+        gtts_lang = extract_gtts_lang(target_lang)
 
-        print(f"[TTS] Generating {len(segments)} segments with lang: {target_lang}")
+        print(f"[TTS] Generating {len(segments)} segments with lang: {gtts_lang}")
         logger.info(f"Generating TTS for {len(segments)} segments with lang: {target_lang}")
 
         tts_segments = []
@@ -121,7 +147,9 @@ class TTSService:
         """Generate TTS using gTTS."""
         from gtts import gTTS
         
-        tts = gTTS(text=text, lang=lang, slow=False)
+        # Extract gTTS lang code
+        gtts_lang = extract_gtts_lang(lang)
+        tts = gTTS(text=text, lang=gtts_lang, slow=False)
         tts.save(str(output_path))
         
         duration = self._get_audio_duration(output_path)
@@ -136,10 +164,11 @@ class TTSService:
     ) -> Tuple[bool, Optional[str]]:
         """Generate TTS for full text."""
         target_lang = voice or self._get_voice_for_language(language)
+        gtts_lang = extract_gtts_lang(target_lang)
 
         try:
             from gtts import gTTS
-            tts = gTTS(text=text, lang=target_lang, slow=False)
+            tts = gTTS(text=text, lang=gtts_lang, slow=False)
             tts.save(str(output_path))
             return True, None
         except Exception as e:

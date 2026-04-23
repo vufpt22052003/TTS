@@ -261,3 +261,98 @@ class TimingInfo:
 
     def __repr__(self):
         return f"TimingInfo(start={self.start:.2f}, end={self.end:.2f}, text='{self.text[:30]}...')"
+
+
+def create_ass_subtitle_file(
+    segments: List[Tuple[float, float, str]],
+    output_path: Path,
+    style: str = "professional"
+) -> Path:
+    """
+    Create professional ASS subtitle file from segments.
+
+    Args:
+        segments: List of (start, end, text) tuples
+        output_path: Output .ass file path
+        style: Style preset - "professional" (Netflix/YouTube), "clean", "minimal"
+
+    Returns:
+        Path to created ASS file
+    """
+    if style == "professional":
+        # Netflix/YouTube style - compact, readable
+        font_size = 28
+        primary_color = "&H00FFFFFF"  # White
+        outline_color = "&H00000000"  # Black outline
+        back_color = "&H80000000"     # Semi-transparent black background
+        outline = 1.5
+        shadow = 2.0
+        margin_l = 15
+        margin_r = 15
+        margin_v = 15
+        alignment = 5  # Bottom center
+        font_name = "Arial"
+    elif style == "clean":
+        # Clean style - no background, just shadow
+        font_size = 26
+        primary_color = "&H00FFFFFF"
+        outline_color = "&H00000000"
+        back_color = "&H00000000"
+        outline = 1.0
+        shadow = 1.5
+        margin_l = 10
+        margin_r = 10
+        margin_v = 10
+        alignment = 5
+        font_name = "Inter"
+    else:
+        # Minimal - smaller, subtle
+        font_size = 22
+        primary_color = "&H00FFFFFF"
+        outline_color = "&H00000000"
+        back_color = "&H00000000"
+        outline = 0.8
+        shadow = 1.0
+        margin_l = 10
+        margin_r = 10
+        margin_v = 10
+        alignment = 5
+        font_name = "Arial"
+
+    ass_header = f"""[Script Info]
+ScriptType: v4.00+
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+YCbCr Matrix: None
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,{font_name},{font_size},{primary_color},{primary_color},{outline_color},{back_color},0,0,0,0,100,100,0,0,1,{outline},{shadow},{alignment},{margin_l},{margin_r},{margin_v},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    ass_events = []
+    for start, end, text in segments:
+        # Convert seconds to ASS timestamp (H:MM:SS.CC)
+        def format_ass_time(seconds):
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
+            secs = seconds % 60
+            centisecs = int((secs % 1) * 100)
+            whole_secs = int(secs)
+            return f"{hours}:{minutes:02d}:{whole_secs:02d}.{centisecs:02d}"
+
+        start_time = format_ass_time(start)
+        end_time = format_ass_time(end)
+
+        # Escape text for ASS format
+        escaped_text = text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
+        ass_events.append(f"Dialogue: 0,{start_time},{end_time},Default,,0,0,0,,{escaped_text}")
+
+    ass_content = ass_header + "\n".join(ass_events)
+
+    output_path.write_text(ass_content, encoding="utf-8-sig")
+    logger.info(f"Created ASS subtitle file: {output_path} ({len(segments)} segments, style={style})")
+
+    return output_path
