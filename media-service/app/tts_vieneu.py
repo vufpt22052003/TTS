@@ -7,6 +7,7 @@ Supports specific voice names like vi-VN-HoaiMyNeural, vi-VN-NamMinhNeural.
 import logging
 import asyncio
 import os
+import shutil
 from pathlib import Path
 from typing import List, Optional, Tuple
 from dataclasses import dataclass
@@ -34,6 +35,8 @@ class TTSService:
 
     def __init__(self, voice: Optional[str] = None):
         self.voice = voice
+        self.ffmpeg_bin = shutil.which("ffmpeg") or "ffmpeg"
+        self.ffprobe_bin = shutil.which("ffprobe") or "ffprobe"
 
     def _get_voice(self, language: str = 'vi') -> str:
         """Get voice to use - prefer explicit voice setting."""
@@ -49,12 +52,29 @@ class TTSService:
         }
         return voice_map.get(language, 'vi-VN-HoaiMyNeural')
 
+    def _voice_to_gtts_lang(self, voice: str) -> str:
+        """Map Edge voice name to gTTS language code."""
+        if not voice:
+            return "vi"
+        voice_l = voice.lower()
+        if voice_l.startswith("vi-"):
+            return "vi"
+        if voice_l.startswith("en-"):
+            return "en"
+        if voice_l.startswith("zh-"):
+            return "zh-CN"
+        if voice_l.startswith("ja-"):
+            return "ja"
+        if voice_l.startswith("ko-"):
+            return "ko"
+        return "vi"
+
     def _get_duration(self, audio_path: Path) -> float:
         """Get audio duration using ffprobe."""
         try:
             import subprocess
             cmd = [
-                'C:\\ffmpeg\\bin\\ffprobe.exe',
+                self.ffprobe_bin,
                 '-v', 'error',
                 '-show_entries', 'format=duration',
                 '-of', 'default=noprint_wrappers=1:nokey=1',
@@ -76,7 +96,7 @@ class TTSService:
         padded_path = audio_path.with_suffix('.padded.mp3')
 
         cmd = [
-            'C:\\ffmpeg\\bin\\ffmpeg.exe',
+            self.ffmpeg_bin,
             '-y',
             '-i', str(audio_path),
             '-af', f'apad=whole_dur={target_duration:.3f}',
@@ -134,6 +154,32 @@ class TTSService:
                     logger.error(f"Edge TTS failed after {max_retries} attempts: {e}")
                     return False, 0.0
 
+    def _generate_gtts_fallback(
+        self,
+        text: str,
+        output_path: Path,
+        target_duration: float,
+        voice: str
+    ) -> Tuple[bool, float]:
+        """Fallback TTS using gTTS when Edge TTS is blocked."""
+        try:
+            from gtts import gTTS
+            gtts_lang = self._voice_to_gtts_lang(voice)
+            tts = gTTS(text=text, lang=gtts_lang, slow=False)
+            tts.save(str(output_path))
+
+            if not output_path.exists() or output_path.stat().st_size < 100:
+                return False, 0.0
+
+            duration = self._get_duration(output_path)
+            if duration < target_duration - 0.05:
+                duration = self._pad_audio_to_duration(output_path, target_duration)
+
+            return duration > 0.1, duration
+        except Exception as e:
+            logger.error(f"gTTS fallback failed: {e}")
+            return False, 0.0
+
     async def _async_generate_edge_tts(self, text: str, output_path: Path, voice: str):
         """Async helper for Edge TTS."""
         from edge_tts import Communicate
@@ -169,6 +215,17 @@ class TTSService:
 
             try:
                 success, duration = self._generate_edge_tts(text, output_path, target_duration, target_voice)
+                if not success:
+                    logger.warning(
+                        "Edge TTS unavailable, fallback to gTTS for segment %s",
+                        seg.index
+                    )
+                    success, duration = self._generate_gtts_fallback(
+                        text,
+                        output_path,
+                        target_duration,
+                        target_voice
+                    )
                 if success and duration > 0.2:
                     tts_seg.duration = duration
                     print(f"[TTS] OK [{seg.index}]: ({duration:.2f}s)")

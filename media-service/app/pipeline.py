@@ -337,21 +337,32 @@ class PipelineProcessor:
             # Step 2: Generate TTS directly from vietsub (only if voiceover enabled)
             if self.config.add_voiceover:
                 tts_dir = job_dir / "tts_segments"
-                tts_segments = self.generate_tts(translated_segments, tts_dir)
-
-                # Check TTS success rate
-                success_count = sum(1 for s in tts_segments if not s.error)
-                if success_count == 0:
-                    result.warnings.append("All TTS segments failed")
-                elif success_count < len(tts_segments) * 0.5:
-                    result.warnings.append(f"Only {success_count}/{len(tts_segments)} TTS segments succeeded")
-
-                # Step 3: Sync audio
                 voiceover_path = job_dir / f"voiceover_{job_id}.mp3"
-                if success_count > 0:
-                    self.sync_audio(tts_segments, voiceover_path)
-                    if voiceover_path.exists():
-                        result.voiceover_path = voiceover_path
+                try:
+                    tts_segments = self.generate_tts(translated_segments, tts_dir)
+
+                    # Check TTS success rate
+                    success_count = sum(1 for s in tts_segments if not s.error)
+                    if success_count == 0:
+                        result.warnings.append("All TTS segments failed, rendering with original audio only")
+                    elif success_count < len(tts_segments) * 0.5:
+                        result.warnings.append(
+                            f"Only {success_count}/{len(tts_segments)} TTS segments succeeded"
+                        )
+
+                    # Step 3: Sync audio
+                    if success_count > 0:
+                        self.sync_audio(tts_segments, voiceover_path)
+                        if voiceover_path.exists():
+                            result.voiceover_path = voiceover_path
+                        else:
+                            result.warnings.append("Voiceover file was not created, using original audio only")
+                    else:
+                        result.voiceover_path = None
+                except Exception as e:
+                    logger.warning(f"TTS/voiceover failed, fallback to original audio: {e}")
+                    result.warnings.append(f"Voiceover disabled due to TTS error: {e}")
+                    result.voiceover_path = None
             else:
                 print(f"[PIPELINE] TTS/Sync SKIPPED (voiceover disabled)")
                 result.voiceover_path = None
@@ -452,29 +463,38 @@ class PipelineProcessor:
             if self.config.add_voiceover:
                 tts_dir = job_dir / "tts_segments"
                 print(f"[PIPELINE] Step 4: Generate TTS")
-                tts_segments = self.generate_tts(translated_segments, tts_dir)
-
-                # Check TTS success rate
-                success_count = sum(1 for s in tts_segments if not s.error)
-                print(f"[PIPELINE] TTS Result: {success_count}/{len(tts_segments)}")
-
-                # FAIL FAST: No TTS = stop
-                if success_count == 0:
-                    raise Exception(f"All TTS segments failed - stopping pipeline")
-
-                # Step 5: Sync audio
-                print(f"[PIPELINE] Step 5: Sync audio")
                 voiceover_path = job_dir / f"voiceover_{job_id}.mp3"
-                self.sync_audio(tts_segments, voiceover_path)
+                try:
+                    tts_segments = self.generate_tts(translated_segments, tts_dir)
 
-                # Verify voiceover was created
-                if not voiceover_path.exists():
-                    raise Exception(f"VOICEOVER NOT CREATED: {voiceover_path}")
-                if voiceover_path.stat().st_size < 1000:
-                    raise Exception(f"VOICEOVER TOO SMALL: {voiceover_path.stat().st_size} bytes")
+                    # Check TTS success rate
+                    success_count = sum(1 for s in tts_segments if not s.error)
+                    print(f"[PIPELINE] TTS Result: {success_count}/{len(tts_segments)}")
 
-                result.voiceover_path = voiceover_path
-                print(f"[PIPELINE] Voiceover ready: {voiceover_path.stat().st_size} bytes")
+                    if success_count == 0:
+                        result.warnings.append("All TTS segments failed, rendering with original audio only")
+                        result.voiceover_path = None
+                    else:
+                        # Step 5: Sync audio
+                        print(f"[PIPELINE] Step 5: Sync audio")
+                        self.sync_audio(tts_segments, voiceover_path)
+
+                        # Verify voiceover was created
+                        if not voiceover_path.exists():
+                            result.warnings.append("Voiceover file was not created, using original audio only")
+                            result.voiceover_path = None
+                        elif voiceover_path.stat().st_size < 1000:
+                            result.warnings.append(
+                                f"Voiceover too small ({voiceover_path.stat().st_size} bytes), using original audio only"
+                            )
+                            result.voiceover_path = None
+                        else:
+                            result.voiceover_path = voiceover_path
+                            print(f"[PIPELINE] Voiceover ready: {voiceover_path.stat().st_size} bytes")
+                except Exception as e:
+                    logger.warning(f"TTS/voiceover failed, fallback to original audio: {e}")
+                    result.warnings.append(f"Voiceover disabled due to TTS error: {e}")
+                    result.voiceover_path = None
             else:
                 print(f"[PIPELINE] Step 4-5: SKIPPED (voiceover disabled)")
                 result.voiceover_path = None

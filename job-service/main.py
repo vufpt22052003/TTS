@@ -14,9 +14,9 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import httpx
 
 logging.basicConfig(level=logging.INFO)
@@ -45,11 +45,13 @@ class JobStatus(str, Enum):
 
 
 class ProcessOptions(BaseModel):
-    """Options for video processing."""
+    """Options for video processing (passed to media-service /process)."""
     add_subtitles: bool = True
     add_voiceover: bool = True
-    source_lang: Optional[str] = None
+    source_lang: Optional[str] = "auto"
+    target_lang: str = "vi"
     voice: Optional[str] = None
+    voiceover_volume: float = 0.8
 
 
 class CreateJobRequest(BaseModel):
@@ -58,10 +60,14 @@ class CreateJobRequest(BaseModel):
     video_path: Optional[str] = None
     job_id: Optional[str] = None
     options: ProcessOptions = ProcessOptions()
+    # When True, block until crawler + media pipeline finish (for webhooks / simple clients).
+    wait: bool = False
 
 
 class JobResponse(BaseModel):
     """Job information response."""
+    model_config = ConfigDict(extra="ignore")
+
     job_id: str
     status: JobStatus
     video_path: Optional[str] = None
@@ -71,6 +77,8 @@ class JobResponse(BaseModel):
     error: Optional[str] = None
     created_at: str
     updated_at: str
+    media_job_id: Optional[str] = None
+    step: Optional[str] = None
 
 
 def update_job(job_id: str, **kwargs) -> None:
@@ -86,105 +94,61 @@ async def process_video_task(
     options: ProcessOptions
 ) -> None:
     """
-    Background task to process video.
-
-    Pipeline:
-    1. Extract audio
-    2. Transcribe
-    3. Translate
-    4. Generate TTS
-    5. Render final video
+    Background task: upload video to media-service, then run full pipeline
+    (STT → translate → TTS → render) via POST /process/{media_job_id}.
     """
     logger.info(f"Starting processing for job: {job_id}")
 
     try:
-        # Step 1: Transcribe
-        update_job(job_id, status=JobStatus.PROCESSING, step="transcribing")
+        update_job(job_id, status=JobStatus.PROCESSING, step="uploading_to_media")
 
-        async with httpx.AsyncClient(timeout=300.0) as client:
-            # Transcribe
-            with open(video_path, 'rb') as f:
-                files = {'file': ('video.mp4', f, 'video/mp4')}
-                data = {'job_id': job_id}
-
-                if options.source_lang:
-                    data['language'] = options.source_lang
-
+        async with httpx.AsyncClient(timeout=3600.0) as client:
+            with open(video_path, "rb") as f:
+                files = {"file": ("video.mp4", f, "video/mp4")}
                 resp = await client.post(
-                    f"{MEDIA_SERVICE_URL}/transcribe",
+                    f"{MEDIA_SERVICE_URL}/upload",
                     files=files,
-                    data=data
                 )
 
             if resp.status_code != 200:
-                raise Exception(f"Transcription failed: {resp.text}")
+                raise Exception(f"Media upload failed: {resp.text}")
 
-            transcribe_result = resp.json()
-            subtitle_path = transcribe_result.get('subtitle_path')
+            upload_json = resp.json()
+            media_job_id = upload_json.get("job_id")
+            if not media_job_id:
+                raise Exception("Media upload did not return job_id")
 
-            # Step 2: Translate
-            update_job(job_id, step="translating")
+            update_job(job_id, step="processing_on_media", media_job_id=media_job_id)
+
+            process_body = {
+                "source_lang": options.source_lang or "auto",
+                "target_lang": options.target_lang,
+                "voice": options.voice or "vi-VN-HoaiMyNeural",
+                "add_subtitles": options.add_subtitles,
+                "add_voiceover": options.add_voiceover,
+                "voiceover_volume": options.voiceover_volume,
+            }
 
             resp = await client.post(
-                f"{MEDIA_SERVICE_URL}/translate",
-                json={
-                    'subtitle_path': subtitle_path,
-                    'source_lang': options.source_lang or 'auto'
-                }
+                f"{MEDIA_SERVICE_URL}/process/{media_job_id}",
+                json=process_body,
             )
 
             if resp.status_code != 200:
-                raise Exception(f"Translation failed: {resp.text}")
+                raise Exception(f"Media process failed: {resp.text}")
 
-            translate_result = resp.json()
-            translated_path = translate_result.get('translated_path')
-
-            # Step 3: Generate TTS
-            update_job(job_id, step="generating_tts")
-
-            resp = await client.post(
-                f"{MEDIA_SERVICE_URL}/tts",
-                json={
-                    'subtitle_path': translated_path,
-                    'voice': options.voice
-                }
-            )
-
-            if resp.status_code != 200:
-                raise Exception(f"TTS generation failed: {resp.text}")
-
-            tts_result = resp.json()
-            voiceover_path = tts_result.get('voiceover_path')
-
-            # Step 4: Render
-            update_job(job_id, step="rendering")
-
-            resp = await client.post(
-                f"{MEDIA_SERVICE_URL}/render",
-                json={
-                    'video_path': video_path,
-                    'subtitle_path': translated_path,
-                    'voiceover_path': voiceover_path,
-                    'job_id': job_id
-                }
-            )
-
-            if resp.status_code != 200:
-                raise Exception(f"Rendering failed: {resp.text}")
-
-            render_result = resp.json()
-
-            # Success
-            update_job(
-                job_id,
-                status=JobStatus.COMPLETED,
-                output_path=render_result.get('output_path'),
-                subtitle_path=translated_path,
-                audio_path=voiceover_path,
-                step="completed"
-            )
-
-            logger.info(f"Job {job_id} completed successfully")
+            result = resp.json()
+            if result.get("status") == "completed":
+                update_job(
+                    job_id,
+                    status=JobStatus.COMPLETED,
+                    output_path=result.get("output_path"),
+                    step="completed",
+                )
+                logger.info(f"Job {job_id} completed successfully (media_job={media_job_id})")
+            else:
+                err = result.get("error") or result.get("detail") or str(result)
+                raise Exception(err)
 
     except Exception as e:
         logger.error(f"Job {job_id} failed: {e}")
@@ -267,13 +231,102 @@ async def create_job(request: CreateJobRequest, background_tasks: BackgroundTask
     # Update job with video path
     update_job(job_id, video_path=video_path)
 
-    # Start processing
-    background_tasks.add_task(
-        process_video_task,
-        job_id,
-        video_path,
-        request.options
+    if request.wait:
+        await process_video_task(job_id, video_path, request.options)
+    else:
+        background_tasks.add_task(
+            process_video_task,
+            job_id,
+            video_path,
+            request.options
+        )
+
+    return JobResponse(**jobs[job_id])
+
+
+def _parse_wait_flag(value: str) -> bool:
+    return str(value).lower() in ("true", "1", "yes", "on")
+
+
+@app.post("/jobs/upload", response_model=JobResponse)
+async def create_job_from_upload(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    wait: str = Form("true"),
+    source_lang: str = Form("zh"),
+    target_lang: str = Form("vi"),
+    voice: Optional[str] = Form(None),
+    add_subtitles: str = Form("true"),
+    add_voiceover: str = Form("true"),
+    voiceover_volume: str = Form("0.8"),
+):
+    """
+    Upload a video file (e.g. Douyin file already downloaded via curl) and run
+    the same media pipeline as POST /jobs (STT, translate, TTS, burn subtitles).
+
+    Use multipart/form-data: field \"file\" = video; other fields optional.
+    Set wait=true to block until processing finishes (default).
+    """
+    job_id = str(uuid.uuid4())[:12]
+
+    jobs[job_id] = {
+        "job_id": job_id,
+        "status": JobStatus.PENDING,
+        "video_path": None,
+        "subtitle_path": None,
+        "audio_path": None,
+        "output_path": None,
+        "error": None,
+        "created_at": datetime.now().isoformat(),
+        "updated_at": datetime.now().isoformat(),
+        "step": "saving_upload",
+    }
+
+    job_dir = MEDIA_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    dest_path = job_dir / "upload.mp4"
+
+    try:
+        raw = await file.read()
+        if not raw:
+            del jobs[job_id]
+            raise HTTPException(status_code=400, detail="Empty upload")
+        dest_path.write_bytes(raw)
+    except HTTPException:
+        raise
+    except Exception as e:
+        if job_id in jobs:
+            del jobs[job_id]
+        raise HTTPException(status_code=500, detail=f"Failed to save upload: {e}")
+
+    video_path = str(dest_path)
+    update_job(job_id, video_path=video_path)
+
+    try:
+        vol = float(voiceover_volume)
+    except ValueError:
+        vol = 0.8
+
+    options = ProcessOptions(
+        source_lang=source_lang or "auto",
+        target_lang=target_lang,
+        voice=(voice.strip() if voice and voice.strip() else None),
+        add_subtitles=_parse_wait_flag(add_subtitles),
+        add_voiceover=_parse_wait_flag(add_voiceover),
+        voiceover_volume=vol,
     )
+
+    request_wait = _parse_wait_flag(wait)
+
+    if request_wait:
+        await process_video_task(job_id, video_path, options)
+    else:
+        background_tasks.add_task(
+            process_video_task,
+            job_id,
+            video_path,
+            options,
+        )
 
     return JobResponse(**jobs[job_id])
 
