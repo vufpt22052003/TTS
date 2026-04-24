@@ -6,6 +6,7 @@ Primary: gTTS (reliable, free)
 
 import logging
 import os
+import shutil
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple
 from dataclasses import dataclass
@@ -65,6 +66,7 @@ class TTSService:
 
     def __init__(self, voice: Optional[str] = None):
         self.voice = voice
+        self.ffprobe_bin = shutil.which("ffprobe") or "ffprobe"
 
     def _get_voice_for_language(self, language: str = 'vi') -> str:
         """Get appropriate voice for language."""
@@ -77,7 +79,7 @@ class TTSService:
         try:
             import subprocess
             cmd = [
-                'C:\\ffmpeg\\bin\\ffprobe.exe',
+                self.ffprobe_bin,
                 '-v', 'error',
                 '-show_entries', 'format=duration',
                 '-of', 'default=noprint_wrappers=1:nokey=1',

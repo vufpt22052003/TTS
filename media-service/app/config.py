@@ -1,15 +1,16 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
 from pathlib import Path
+from pydantic import model_validator
 
 
 class Settings(BaseSettings):
     """Application settings."""
 
     # Paths
-    media_dir: Path = Path("d:/TTS/media-service/data")
-    temp_dir: Path = Path("d:/TTS/media-service/temp")
-    videos_dir: Path = Path("d:/TTS/media-service/videos")  # Chỉ lưu video đã download
+    media_dir: Path = Path("./data")
+    temp_dir: Optional[Path] = None
+    videos_dir: Optional[Path] = None  # Chỉ lưu video đã download
 
     # Whisper settings
     whisper_model: str = "medium"  # medium for better accuracy (use large-v3 if GPU available)
@@ -40,6 +41,15 @@ class Settings(BaseSettings):
     class Config:
         env_prefix = ""
         case_sensitive = False
+
+    @model_validator(mode="after")
+    def resolve_paths(self) -> "Settings":
+        """Resolve dependent paths from media_dir when not explicitly set."""
+        if self.temp_dir is None:
+            self.temp_dir = self.media_dir / "temp"
+        if self.videos_dir is None:
+            self.videos_dir = self.media_dir / "videos"
+        return self
 
 
 # Global settings instance

@@ -198,6 +198,14 @@ class VideoDownloader:
         if not self.platform:
             return self.PLATFORM_SETTINGS[Platform.UNKNOWN]
         return self.PLATFORM_SETTINGS.get(self.platform, self.PLATFORM_SETTINGS[Platform.UNKNOWN])
+
+    def _normalize_extracted_url(self, url: str) -> str:
+        """Normalize escaped URLs extracted from HTML/JSON blobs."""
+        normalized = url.strip()
+        normalized = normalized.replace("\\u002F", "/").replace("\\/", "/")
+        normalized = normalized.replace("\\u0026", "&").replace("\\u003D", "=")
+        normalized = normalized.replace("\\\\", "")
+        return normalized
     
     def _get_ytdlp_opts(self, output_path: Path, use_cookies: bool = False) -> Dict[str, Any]:
         """Build yt-dlp options."""
@@ -298,6 +306,8 @@ class VideoDownloader:
         start_time = time.time()
         output_path = self.output_dir / f"{job_id}.mp4"
         
+        last_error: Optional[str] = None
+
         for attempt in range(self.max_retries):
             try:
                 logger.info(f"Trying {strategy.value} (attempt {attempt + 1}/{self.max_retries})")
@@ -322,6 +332,8 @@ class VideoDownloader:
                 
                 if result.success and result.file_size > 0:
                     return result
+
+                last_error = result.error
                 
                 # Retry on failure
                 if attempt < self.max_retries - 1:
@@ -345,7 +357,7 @@ class VideoDownloader:
             strategy_used=strategy,
             file_path=output_path,
             file_size=output_path.stat().st_size if output_path.exists() else 0,
-            error=f"All {self.max_retries} attempts failed",
+            error=f"All {self.max_retries} attempts failed. Last error: {last_error or 'unknown'}",
             duration_seconds=time.time() - start_time,
         )
     
@@ -614,7 +626,7 @@ class VideoDownloader:
                     url = match.group(1)
                     if url.startswith("//"):
                         url = "https:" + url
-                    return url
+                    return self._normalize_extracted_url(url)
         
         elif self.platform == Platform.YOUTUBE:
             # YouTube streaming URL patterns
@@ -625,7 +637,7 @@ class VideoDownloader:
             for pattern in patterns:
                 match = re.search(pattern, html)
                 if match:
-                    return match.group(1)
+                    return self._normalize_extracted_url(match.group(1))
         
         elif self.platform == Platform.TWITTER:
             # Twitter video URL patterns
@@ -639,12 +651,12 @@ class VideoDownloader:
                     url = match.group(1)
                     if url.startswith("//"):
                         url = "https:" + url
-                    return url
+                    return self._normalize_extracted_url(url)
         
         # Generic MP4 URL extraction
         mp4_pattern = r'(https?://[^\s"\'<>]+\.mp4(?:[^\s"\'<>]*)?)'
         match = re.search(mp4_pattern, html)
         if match:
-            return match.group(1)
+            return self._normalize_extracted_url(match.group(1))
         
         return None
